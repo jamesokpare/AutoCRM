@@ -1,0 +1,24 @@
+{
+  "name": "@crm-tool/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@crm-tool/db": "workspace:*",
+    "@crm-tool/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@crm-tool/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
