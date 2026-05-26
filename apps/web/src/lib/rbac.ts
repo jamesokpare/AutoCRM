@@ -97,6 +97,19 @@ export class PermissionError extends Error {
 }
 
 /**
+ * Asserts the session is authenticated, without requiring any capability.
+ *
+ * Use for features intentionally open to every signed-in team member (client
+ * details, job status, daily client updates, company KPIs, attendance)
+ * regardless of role. Throws `PermissionError("UNAUTHENTICATED")` otherwise.
+ */
+export function requireAuth(session: { user?: unknown } | null | undefined): void {
+  if (!session?.user) {
+    throw new PermissionError("UNAUTHENTICATED", "You must be signed in.");
+  }
+}
+
+/**
  * Asserts the session user may perform `cap`. Throws `PermissionError` otherwise.
  *
  * Enforcement order (SPEC §5):
