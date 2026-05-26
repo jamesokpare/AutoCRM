@@ -107,8 +107,43 @@ model Client {
   feedback       Feedback[]
   communications Communication[]
   reminders      Reminder[]
+  updates        ClientUpdate[]
 
   @@index([name])
+}
+
+// Free-form daily progress note logged against a client. Open to all
+// authenticated users (add + edit) — there is no role gate on this feature.
+model ClientUpdate {
+  id        String   @id @default(cuid())
+  clientId  String
+  authorId  String
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  author User   @relation("ClientUpdateAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+// Clock-in / clock-out attendance record. One open row (clockOut = null) per
+// user at a time. Visible to the whole team.
+model Attendance {
+  id        String    @id @default(cuid())
+  userId    String
+  clockIn   DateTime  @default(now())
+  clockOut  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation("UserAttendance", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([clockIn])
 }
 
 model Vehicle {

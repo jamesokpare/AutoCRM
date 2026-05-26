@@ -34,6 +34,8 @@ model User {
   communications  Communication[]     @relation("CommunicationSender")
   feedback        Feedback[]          @relation("FeedbackCreatedBy")
   reminders       Reminder[]          @relation("ReminderAssignee")
+  clientUpdates   ClientUpdate[]      @relation("ClientUpdateAuthor")
+  attendance      Attendance[]        @relation("UserAttendance")
 
   @@unique([email])
   @@map("user")

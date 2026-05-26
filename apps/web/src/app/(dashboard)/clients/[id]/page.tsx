@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 
 import { ApologyDialog } from "@/components/clients/apology-dialog";
 import { ClientForm } from "@/components/clients/client-form";
+import { ClientUpdateForm } from "@/components/clients/client-update-form";
 import { FeedbackForm } from "@/components/clients/feedback-form";
 import { AddPart, PartControl, StatusControl } from "@/components/clients/order-actions";
 import { OrderForm } from "@/components/clients/order-form";
@@ -47,8 +48,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const user = session?.user as { id: string; roles?: Role[] } | undefined;
   const roles = (user?.roles ?? []) as Role[];
 
-  const canEdit = can(roles, "edit_clients_orders");
-  const canStatus = can(roles, "update_job_status");
+  // Editing client details and changing job status are open to every signed-in
+  // team member. Parts + AI apology remain role-gated.
+  const canEdit = true;
+  const canStatus = true;
   const canParts = can(roles, "update_parts");
   const canApology = can(roles, "use_ai_apology");
 
@@ -270,6 +273,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 </Card>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      {/* Daily client updates — open to all signed-in users */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">Daily updates</h2>
+          <ClientUpdateForm
+            clientId={client.id}
+            trigger={<Button size="xs" variant="outline">Add update</Button>}
+          />
+        </div>
+        {client.updates.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No daily updates yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {client.updates.map((u) => (
+              <Card key={u.id} className="gap-1 p-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{fmtDateTime(u.createdAt)}</span>
+                  <ClientUpdateForm
+                    clientId={client.id}
+                    update={{ id: u.id, note: u.note }}
+                    trigger={<Button size="xs" variant="ghost">Edit</Button>}
+                  />
+                </div>
+                <p className="whitespace-pre-wrap">{u.note}</p>
+                <div className="text-xs text-muted-foreground">— {u.author.name}</div>
+              </Card>
+            ))}
           </div>
         )}
       </section>

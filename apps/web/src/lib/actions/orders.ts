@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { withMutation } from "@/lib/mutation";
-import { can, PermissionError, requirePermission } from "@/lib/rbac";
+import { PermissionError, requireAuth, requirePermission } from "@/lib/rbac";
 import type { ActionResult } from "./orders-types";
 
 interface SessionUser {
@@ -73,7 +73,7 @@ export async function createOrder(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const user = await getSessionUser();
-    requirePermission(user ? { user } : null, "edit_clients_orders");
+    requireAuth(user ? { user } : null);
 
     const vehicleId = str(form.get("vehicleId"));
     const description = str(form.get("description"));
@@ -131,7 +131,7 @@ export async function updateOrder(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const user = await getSessionUser();
-    requirePermission(user ? { user } : null, "edit_clients_orders");
+    requireAuth(user ? { user } : null);
 
     const description = str(form.get("description"));
     if (!description) return { ok: false, error: "Description is required." };
@@ -161,9 +161,9 @@ export async function updateOrder(
 }
 
 /**
- * CLT-07: set order status. Requires `update_job_status`. Technicians may only
- * update orders ASSIGNED to them (SPEC §5 footnote). A statusReason is REQUIRED
- * (rejected here) when the new status is FAILED or ON_HOLD.
+ * CLT-07: set order (job) status. Open to every authenticated team member —
+ * any signed-in user may change a client's job status. A statusReason is
+ * REQUIRED (rejected here) when the new status is FAILED or ON_HOLD.
  */
 export async function setOrderStatus(
   orderId: string,
@@ -172,7 +172,7 @@ export async function setOrderStatus(
 ): Promise<ActionResult> {
   try {
     const user = await getSessionUser();
-    const roles = requirePermission(user ? { user } : null, "update_job_status");
+    requireAuth(user ? { user } : null);
 
     if (!(Object.values(OrderStatus) as string[]).includes(status)) {
       return { ok: false, error: "Invalid status." };
@@ -185,16 +185,9 @@ export async function setOrderStatus(
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true, clientId: true, assignedTechId: true, status: true },
+      select: { id: true, clientId: true, status: true },
     });
     if (!order) return { ok: false, error: "Order not found." };
-
-    // Technician restriction: assigned-only. A technician without a higher
-    // capability role may only touch their own assigned orders.
-    const isPrivileged = can(roles, "edit_clients_orders");
-    if (!isPrivileged && order.assignedTechId !== user!.id) {
-      return { ok: false, error: "Technicians can only update orders assigned to them." };
-    }
 
     await withMutation(
       {

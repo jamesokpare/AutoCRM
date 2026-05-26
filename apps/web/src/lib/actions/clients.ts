@@ -12,21 +12,25 @@ import {
   type ClientListRow,
   getClientList,
 } from "@/lib/queries/clients";
-import { PermissionError, requirePermission } from "@/lib/rbac";
+import { PermissionError, requireAuth } from "@/lib/rbac";
 import type { ActionResult } from "./clients-types";
 
-/** Shape of the Better-Auth session user we read for RBAC. */
+/** Shape of the Better-Auth session user we read. */
 interface SessionUser {
   id: string;
   roles?: Role[] | null;
   isApproved?: boolean | null;
 }
 
-/** Loads the session, asserting `edit_clients_orders`. Returns the user. */
+/**
+ * Loads the session, asserting only that the user is signed in. Editing client
+ * details is intentionally open to every authenticated team member (no role
+ * gate). Returns the user.
+ */
 async function requireEdit(): Promise<SessionUser> {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = session?.user as SessionUser | undefined;
-  requirePermission(user ? { user } : null, "edit_clients_orders");
+  requireAuth(user ? { user } : null);
   return user!;
 }
 
