@@ -15,7 +15,7 @@ import { can } from "@/lib/rbac";
 export default async function ClientsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   const roles = ((session?.user as { roles?: Role[] } | undefined)?.roles ?? []) as Role[];
-  const canEdit = Boolean(session?.user?.isApproved) && can(roles, "edit_clients_orders");
+  const canEdit = can(roles, "edit_clients_orders");
 
   const clients = await getClientList();
 

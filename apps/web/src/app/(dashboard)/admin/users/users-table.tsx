@@ -23,7 +23,7 @@ import {
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { approveUser, deactivateUser, deleteUser, setRoles } from "./actions";
+import { deactivateUser, deleteUser, setRoles } from "./actions";
 import type { AdminUserRow } from "./actions-types";
 
 const ROLE_OPTIONS = Object.values(Role) as Role[];
@@ -135,35 +135,13 @@ export function UsersTable({
               <div className="flex flex-wrap gap-1">
                 {user.banned ? (
                   <Badge variant="destructive">Deactivated</Badge>
-                ) : user.isApproved ? (
-                  <Badge variant="success">Approved</Badge>
                 ) : (
-                  <Badge variant="warning">Pending</Badge>
+                  <Badge variant="success">Active</Badge>
                 )}
               </div>
             </TableCell>
             <TableCell>
               <div className="flex flex-wrap justify-end gap-1.5">
-                {!user.isApproved ? (
-                  <Button
-                    size="xs"
-                    disabled={pending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        const res = await approveUser(user.id);
-                        if (!res.ok) {
-                          toast.error(res.error ?? "Failed");
-                          return;
-                        }
-                        toast.success("Approved");
-                        patch(user.id, { isApproved: true });
-                      })
-                    }
-                  >
-                    Approve
-                  </Button>
-                ) : null}
-
                 <RoleEditor user={user} onSaved={(roles) => patch(user.id, { roles })} />
 
                 {user.id !== currentUserId ? (

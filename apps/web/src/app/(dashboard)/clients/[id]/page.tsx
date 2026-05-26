@@ -44,14 +44,13 @@ function fmtDateTime(d: Date): string {
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
-  const user = session?.user as { id: string; roles?: Role[]; isApproved?: boolean } | undefined;
+  const user = session?.user as { id: string; roles?: Role[] } | undefined;
   const roles = (user?.roles ?? []) as Role[];
-  const approved = Boolean(user?.isApproved);
 
-  const canEdit = approved && can(roles, "edit_clients_orders");
-  const canStatus = approved && can(roles, "update_job_status");
-  const canParts = approved && can(roles, "update_parts");
-  const canApology = approved && can(roles, "use_ai_apology");
+  const canEdit = can(roles, "edit_clients_orders");
+  const canStatus = can(roles, "update_job_status");
+  const canParts = can(roles, "update_parts");
+  const canApology = can(roles, "use_ai_apology");
 
   const client = await getClientDetail(id);
   if (!client) notFound();

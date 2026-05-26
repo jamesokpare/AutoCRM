@@ -1,7 +1,6 @@
 "use client";
 
 import type { Role } from "@crm-tool/db";
-import { Badge } from "@crm-tool/ui/components/badge";
 import { Button } from "@crm-tool/ui/components/button";
 import { Separator } from "@crm-tool/ui/components/separator";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@crm-tool/ui/components/sheet";
@@ -49,7 +48,6 @@ interface SidebarUser {
   name: string;
   email: string;
   roles: Role[];
-  isApproved: boolean;
 }
 
 function NavLinks({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => void }) {
@@ -89,11 +87,6 @@ function SidebarInner({ user, onNavigate }: { user: SidebarUser; onNavigate?: ()
       <div className="px-2.5 py-3">
         <div className="text-sm font-semibold">CRM</div>
         <div className="mt-1 truncate text-xs text-muted-foreground">{user.email}</div>
-        {!user.isApproved ? (
-          <Badge variant="warning" className="mt-2">
-            Awaiting approval
-          </Badge>
-        ) : null}
       </div>
       <Separator />
       <div className="flex-1 overflow-y-auto py-2">

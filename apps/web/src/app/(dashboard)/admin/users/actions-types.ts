@@ -14,7 +14,6 @@ export interface AdminUserRow {
   name: string;
   email: string;
   roles: Role[];
-  isApproved: boolean;
   profileCompleted: boolean;
   banned: boolean;
   createdAt: Date;

@@ -14,8 +14,7 @@ import { can } from "@/lib/rbac";
 export default async function KpiPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   const roles = ((session?.user as { roles?: Role[] } | undefined)?.roles ?? []) as Role[];
-  const approved = (session?.user as { isApproved?: boolean } | undefined)?.isApproved ?? false;
-  const canEdit = approved && can(roles, "set_kpi_targets");
+  const canEdit = can(roles, "set_kpi_targets");
 
   const kpis = await getKpiBoard();
 

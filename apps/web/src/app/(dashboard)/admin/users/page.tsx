@@ -9,8 +9,8 @@ import { listUsers } from "./actions";
 import { UsersTable } from "./users-table";
 
 /**
- * AUTH-04/05: admin user management. Lists users; approve, set roles,
- * deactivate, delete. Guarded to ADMIN (manage_users capability).
+ * AUTH-04: admin user management. Lists users; set roles, deactivate, delete.
+ * Guarded to ADMIN (manage_users capability).
  */
 export default async function AdminUsersPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -26,7 +26,7 @@ export default async function AdminUsersPage() {
       <div>
         <h1 className="text-lg font-semibold">User Administration</h1>
         <p className="text-xs text-muted-foreground">
-          Approve accounts, assign roles, deactivate or delete users.
+          Assign roles, deactivate or delete users.
         </p>
       </div>
       <UsersTable initialUsers={users} currentUserId={session.user.id} />

@@ -16,11 +16,8 @@ const ALL_ROLES = Object.values(Role) as Role[];
  * AUTH-02: first-login profile completion. Validates + persists the user's
  * role(s), KPIs and bottlenecks, then sets `profileCompleted = true`.
  *
- * Approval (AUTH-05 / SPEC §9): normally new accounts stay `isApproved = false`
- * (read-only) until an admin approves them via /admin/users. BUT the very first
- * account to onboard is the workshop owner — there is no admin to approve them
- * yet (chicken-and-egg), so when no approved user exists we bootstrap this one
- * as an approved ADMIN. Every subsequent account follows the normal flow.
+ * Accounts are usable immediately after onboarding — there is no admin-approval
+ * gate; what a user can edit is governed purely by their role(s) (SPEC §5).
  */
 export async function completeProfile(input: CompleteProfileInput): Promise<CompleteProfileResult> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -28,19 +25,12 @@ export async function completeProfile(input: CompleteProfileInput): Promise<Comp
     return { ok: false, error: "Not authenticated." };
   }
 
-  let roles = (input.roles ?? []).filter((r): r is Role => ALL_ROLES.includes(r));
+  const roles = (input.roles ?? []).filter((r): r is Role => ALL_ROLES.includes(r));
   if (roles.length === 0) {
     return { ok: false, error: "Select at least one role." };
   }
 
   const userId = session.user.id;
-
-  // Bootstrap the first account as an approved Admin (the owner).
-  const approvedCount = await prisma.user.count({ where: { isApproved: true } });
-  const isBootstrap = approvedCount === 0;
-  if (isBootstrap && !roles.includes(Role.ADMIN)) {
-    roles = [...roles, Role.ADMIN];
-  }
 
   await withMutation(
     { entityType: "User", action: "profile_completed", userId, entityId: userId },
@@ -52,8 +42,7 @@ export async function completeProfile(input: CompleteProfileInput): Promise<Comp
           kpis: input.kpis?.trim() || null,
           bottlenecks: input.bottlenecks?.trim() || null,
           profileCompleted: true,
-          // Only the bootstrap owner is auto-approved; others await admin approval.
-          ...(isBootstrap ? { isApproved: true } : {}),
+          isApproved: true,
         },
       }),
   );

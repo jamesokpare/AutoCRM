@@ -85,11 +85,11 @@ export interface SessionLike {
 
 /**
  * Thrown by `requirePermission` when authorization fails. Carries a stable
- * `code` so callers / UI can distinguish "not approved" from "forbidden".
+ * `code` so callers / UI can distinguish the failure reason.
  */
 export class PermissionError extends Error {
-  code: "UNAUTHENTICATED" | "NOT_APPROVED" | "FORBIDDEN";
-  constructor(code: "UNAUTHENTICATED" | "NOT_APPROVED" | "FORBIDDEN", message?: string) {
+  code: "UNAUTHENTICATED" | "FORBIDDEN";
+  constructor(code: "UNAUTHENTICATED" | "FORBIDDEN", message?: string) {
     super(message ?? code);
     this.name = "PermissionError";
     this.code = code;
@@ -99,10 +99,9 @@ export class PermissionError extends Error {
 /**
  * Asserts the session user may perform `cap`. Throws `PermissionError` otherwise.
  *
- * Enforcement order (SPEC §5 + AUTH-05):
+ * Enforcement order (SPEC §5):
  *   1. Must be authenticated.
- *   2. Must be approved (`isApproved`) — unapproved accounts are read-only.
- *   3. One of the user's roles must grant the capability.
+ *   2. One of the user's roles must grant the capability.
  *
  * Call this at the top of every write server action. Returns the validated
  * roles for convenience.
@@ -110,12 +109,6 @@ export class PermissionError extends Error {
 export function requirePermission(session: SessionLike | null | undefined, cap: Capability): Role[] {
   if (!session?.user) {
     throw new PermissionError("UNAUTHENTICATED", "You must be signed in.");
-  }
-  if (!session.user.isApproved) {
-    throw new PermissionError(
-      "NOT_APPROVED",
-      "Your account is awaiting admin approval before you can make changes.",
-    );
   }
   const roles = toRoles(session.user.roles);
   if (!can(roles, cap)) {

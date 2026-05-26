@@ -35,9 +35,6 @@ export async function logFeedback(
     const session = await auth.api.getSession({ headers: await headers() });
     const user = session?.user as SessionUser | undefined;
     if (!user) return { ok: false, error: "You must be signed in." };
-    if (!user.isApproved) {
-      return { ok: false, error: "Your account is awaiting approval before you can log feedback." };
-    }
 
     const rating = Math.trunc(input.rating);
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {

@@ -23,8 +23,7 @@ export default async function OnboardingPage() {
     <div className="mx-auto w-full max-w-lg px-4 py-10">
       <h1 className="text-xl font-semibold">Complete your profile</h1>
       <p className="mt-1 text-xs text-muted-foreground">
-        Pick your role(s) and tell us your focus areas. An admin will approve your account before
-        you can make changes.
+        Pick your role(s) and tell us your focus areas.
       </p>
       <div className="mt-6">
         <OnboardingForm />

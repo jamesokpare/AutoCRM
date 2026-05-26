@@ -138,7 +138,7 @@ export async function getReminderTargets(): Promise<ReminderTargets> {
       select: { id: true, name: true },
     }),
     prisma.user.findMany({
-      where: { isApproved: true },
+      where: { banned: { not: true } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
