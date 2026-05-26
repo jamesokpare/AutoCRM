@@ -82,6 +82,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             {client.preferredChannel ? ` · prefers ${client.preferredChannel}` : ""}
           </p>
           {client.address ? <p className="text-xs text-muted-foreground">{client.address}</p> : null}
+          <p className="text-xs text-muted-foreground">Last updated {fmtDateTime(client.updatedAt)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <FeedbackForm

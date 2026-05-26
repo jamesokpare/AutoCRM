@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@crm-tool/auth";
-import { Channel, type Role } from "@crm-tool/db";
+import { Channel, OrderStatus, PartAvailability, type Role } from "@crm-tool/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
@@ -61,6 +61,41 @@ function str(value: FormDataEntryValue | null): string | null {
   return v ? v : null;
 }
 
+function parseDate(value: FormDataEntryValue | null): Date | null {
+  const v = str(value);
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseStatus(value: FormDataEntryValue | null): OrderStatus | null {
+  const v = str(value);
+  if (!v) return null;
+  return (Object.values(OrderStatus) as string[]).includes(v) ? (v as OrderStatus) : null;
+}
+
+function parseAvailability(value: string): PartAvailability {
+  return (Object.values(PartAvailability) as string[]).includes(value)
+    ? (value as PartAvailability)
+    : PartAvailability.NOT_AVAILABLE;
+}
+
+const REQUIRES_REASON: OrderStatus[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];
+
+/**
+ * Reads the parts list from the intake form. Parts arrive as index-aligned
+ * repeated `partName` / `partAvailability` fields; an empty name is skipped.
+ */
+function parsePartsPairs(form: FormData): { name: string; availability: PartAvailability }[] {
+  const names = form.getAll("partName").map((p) => (p as string).trim());
+  const avails = form.getAll("partAvailability").map((a) => a as string);
+  const parts: { name: string; availability: PartAvailability }[] = [];
+  names.forEach((name, i) => {
+    if (name) parts.push({ name, availability: parseAvailability(avails[i] ?? "") });
+  });
+  return parts;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Client CRUD (CLT-01)
 // ─────────────────────────────────────────────────────────────
@@ -86,6 +121,116 @@ export async function createClient(form: FormData): Promise<ActionResult<{ id: s
         }),
       (c) => c.id,
     );
+
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { id: client.id } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Full client intake: creates a client plus, optionally, a first vehicle and a
+ * first order (with status, parts + availability, expected date and assigned
+ * technician) in one submission. Open to every signed-in team member.
+ *
+ * The vehicle is created only when make/model/year are provided; the order is
+ * created only when a description is provided AND a vehicle was created (an
+ * order requires a vehicle). Each entity is logged via `withMutation`.
+ */
+export async function createClientFull(form: FormData): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await requireEdit();
+    const name = str(form.get("name"));
+    if (!name) return { ok: false, error: "Client name is required." };
+
+    // Vehicle is optional; present when make+model+year are all filled in.
+    const make = str(form.get("make"));
+    const model = str(form.get("model"));
+    const year = parseYear(form.get("year"));
+    const hasVehicle = Boolean(make && model && year !== null);
+
+    // Order is optional; requires a description and a vehicle to attach to.
+    const description = str(form.get("description"));
+    const wantsOrder = Boolean(description);
+    if (wantsOrder && !hasVehicle) {
+      return { ok: false, error: "Add a vehicle before creating an order." };
+    }
+
+    const status = parseStatus(form.get("status")) ?? OrderStatus.PENDING;
+    const statusReason = str(form.get("statusReason"));
+    if (wantsOrder && REQUIRES_REASON.includes(status) && !statusReason) {
+      return { ok: false, error: "A reason is required when status is Failed or On Hold." };
+    }
+
+    const client = await withMutation(
+      { entityType: "Client", action: "created", userId: user.id, metadata: { name } },
+      async () =>
+        prisma.client.create({
+          data: {
+            name,
+            phone: str(form.get("phone")),
+            email: str(form.get("email")),
+            whatsapp: str(form.get("whatsapp")),
+            address: str(form.get("address")),
+            preferredChannel: parseChannel(form.get("preferredChannel")),
+          },
+        }),
+      (c) => c.id,
+    );
+
+    if (hasVehicle) {
+      const vehicle = await withMutation(
+        {
+          entityType: "Vehicle",
+          action: "created",
+          userId: user.id,
+          metadata: { clientId: client.id, make, model, year },
+        },
+        async () =>
+          prisma.vehicle.create({
+            data: {
+              clientId: client.id,
+              make: make!,
+              model: model!,
+              year: year!,
+              plate: str(form.get("plate")),
+              vin: str(form.get("vin")),
+              color: str(form.get("color")),
+              mileage: parseYear(form.get("mileage")),
+            },
+          }),
+        (v) => v.id,
+      );
+
+      if (wantsOrder) {
+        const parts = parsePartsPairs(form);
+        await withMutation(
+          {
+            entityType: "Order",
+            action: "created",
+            userId: user.id,
+            metadata: { clientId: client.id, vehicleId: vehicle.id, status },
+          },
+          async () =>
+            prisma.order.create({
+              data: {
+                clientId: client.id,
+                vehicleId: vehicle.id,
+                description: description!,
+                status,
+                statusReason: REQUIRES_REASON.includes(status) ? statusReason : null,
+                receivedDate: parseDate(form.get("receivedDate")) ?? new Date(),
+                expectedDate: parseDate(form.get("expectedDate")),
+                assignedTechId: str(form.get("assignedTechId")),
+                parts: parts.length ? { create: parts } : undefined,
+              },
+            }),
+          (o) => o.id,
+        );
+      }
+    }
 
     revalidatePath("/clients");
     revalidatePath("/dashboard");
