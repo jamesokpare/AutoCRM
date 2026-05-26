@@ -25,19 +25,14 @@ import type { ActionResult, CreateReminderInput } from "./reminders-types";
 
 interface SessionUser {
   id: string;
-  isApproved?: boolean | null;
 }
 
 class ReminderAuthError extends Error {}
 
-async function requireApprovedUser(): Promise<SessionUser> {
+async function requireUser(): Promise<SessionUser> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ReminderAuthError("You must be signed in.");
-  const user = session.user as SessionUser;
-  if (!user.isApproved) {
-    throw new ReminderAuthError("Your account is awaiting admin approval before you can make changes.");
-  }
-  return user;
+  return session.user as SessionUser;
 }
 
 function mapError(e: unknown): ActionResult {
@@ -62,7 +57,7 @@ export async function fetchReminderCentre(scope: "mine" | "team"): Promise<Remin
 /** REM-06: create a one-off or recurring reminder on an order or client. */
 export async function createReminder(input: CreateReminderInput): Promise<ActionResult> {
   try {
-    const user = await requireApprovedUser();
+    const user = await requireUser();
 
     const due = new Date(input.dueAt);
     if (Number.isNaN(due.getTime())) return { ok: false, error: "Due date is invalid." };
@@ -109,7 +104,7 @@ async function transition(
   action: string,
 ): Promise<ActionResult> {
   try {
-    const user = await requireApprovedUser();
+    const user = await requireUser();
     await withMutation(
       { entityType: "Reminder", action, userId: user.id, entityId: id },
       async () => prisma.reminder.update({ where: { id }, data: { state: next } }),
