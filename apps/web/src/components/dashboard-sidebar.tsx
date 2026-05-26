@@ -22,6 +22,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Route } from "next";
 
 import { authClient } from "@/lib/auth-client";
+import { DrivewellLogo, DrivewellMark } from "@/components/logo";
 
 interface NavItem {
   href: Route;
@@ -85,7 +86,10 @@ function SidebarInner({ user, onNavigate }: { user: SidebarUser; onNavigate?: ()
   return (
     <div className="flex h-full flex-col">
       <div className="px-2.5 py-3">
-        <div className="text-sm font-semibold">CRM</div>
+        <div className="flex items-center gap-2">
+          <DrivewellLogo />
+          <span className="text-sm font-semibold text-muted-foreground">CRM</span>
+        </div>
         <div className="mt-1 truncate text-xs text-muted-foreground">{user.email}</div>
       </div>
       <Separator />
@@ -120,7 +124,11 @@ export function DashboardSidebar({ user }: { user: SidebarUser }) {
 
       {/* Mobile top bar + sheet */}
       <div className="flex items-center justify-between border-b bg-card px-3 py-2 md:hidden">
-        <span className="text-sm font-semibold">CRM</span>
+        <span className="flex items-center gap-2">
+          <DrivewellMark className="size-6 shrink-0" />
+          <span className="text-sm font-bold tracking-tight">Drivewell</span>
+          <span className="text-sm font-semibold text-muted-foreground">CRM</span>
+        </span>
         <Sheet>
           <SheetTrigger
             render={
