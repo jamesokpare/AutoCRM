@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "crm-tool",
-  description: "crm-tool",
+  title: "Drivewell CRM",
+  description: "Drivewell CRM",
 };
 
 export default function RootLayout({

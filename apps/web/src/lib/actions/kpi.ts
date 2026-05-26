@@ -7,15 +7,15 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { withMutation } from "@/lib/mutation";
-import { PermissionError, requirePermission } from "@/lib/rbac";
+import { PermissionError, requireAuth } from "@/lib/rbac";
 import { detectAutoSource, getKpiBoard, type KpiView } from "@/lib/queries/kpi";
 import type { ActionResult, KpiInput } from "./kpi-types";
 
 /**
  * Company KPI board mutations (Module J, KPI-01..04).
  *
- * Setting / editing targets requires the `set_kpi_targets` capability
- * (Admin/Manager — SPEC §5). All writes route through `withMutation` so an
+ * Creating / editing KPIs is intentionally open to every authenticated team
+ * member (no role gate). All writes route through `withMutation` so an
  * ActivityLog row + the (no-op) domain-event seam fire uniformly.
  */
 
@@ -27,17 +27,7 @@ interface SessionUser {
 
 async function requireKpiEditor(): Promise<SessionUser> {
   const session = await auth.api.getSession({ headers: await headers() });
-  requirePermission(
-    session
-      ? {
-          user: {
-            roles: (session.user as SessionUser).roles,
-            isApproved: (session.user as SessionUser).isApproved,
-          },
-        }
-      : null,
-    "set_kpi_targets",
-  );
+  requireAuth(session ? { user: session.user as SessionUser } : null);
   return session!.user as SessionUser;
 }
 

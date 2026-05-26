@@ -156,6 +156,10 @@ const clientDetailInclude = {
     orderBy: { createdAt: "desc" },
     include: { sender: { select: { id: true, name: true } } },
   },
+  updates: {
+    orderBy: { createdAt: "desc" },
+    include: { author: { select: { id: true, name: true } } },
+  },
 } satisfies Prisma.ClientInclude;
 
 export type ClientDetail = Prisma.ClientGetPayload<{ include: typeof clientDetailInclude }>;
