@@ -14,16 +14,13 @@ const ALL_ROLES = Object.values(Role) as Role[];
 interface SessionUser {
   id: string;
   roles?: Role[] | null;
-  isApproved?: boolean | null;
 }
 
 /** Loads the session and asserts the caller may manage users (AUTH-04). */
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
   requirePermission(
-    session
-      ? { user: { roles: (session.user as SessionUser).roles, isApproved: (session.user as SessionUser).isApproved } }
-      : null,
+    session ? { user: { roles: (session.user as SessionUser).roles } } : null,
     "manage_users",
   );
   return session!.user as SessionUser;
@@ -39,23 +36,12 @@ export async function listUsers(): Promise<AdminUserRow[]> {
       name: true,
       email: true,
       roles: true,
-      isApproved: true,
       profileCompleted: true,
       banned: true,
       createdAt: true,
     },
   });
   return users.map((u) => ({ ...u, banned: u.banned ?? false }));
-}
-
-/** AUTH-05: approve an account, granting edit rights (subject to RBAC). */
-export async function approveUser(userId: string): Promise<ActionResult> {
-  const admin = await requireAdmin();
-  await withMutation(
-    { entityType: "User", action: "approved", userId: admin.id, entityId: userId },
-    async () => prisma.user.update({ where: { id: userId }, data: { isApproved: true } }),
-  );
-  return { ok: true };
 }
 
 /** AUTH-04: set a user's CRM roles. */
