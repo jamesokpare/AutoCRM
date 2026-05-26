@@ -7,3 +7,319 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ─────────────────────────────────────────────────────────────
+// Enums (SPEC §3)
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  SERVICE_ADVISOR
+  TECHNICIAN
+  PARTS_STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ON_HOLD
+}
+
+enum PartAvailability {
+  AVAILABLE
+  NOT_AVAILABLE
+  ON_ORDER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum Channel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum CommunicationType {
+  STATUS_UPDATE
+  APOLOGY
+  MONTHLY_CHECKIN
+  MANUAL
+}
+
+// SENT only reachable in the messaging phase.
+enum CommunicationState {
+  DRAFT
+  SENT
+}
+
+enum ReminderType {
+  DAILY_UPDATE
+  MONTHLY_CHECKIN
+  CUSTOM
+}
+
+enum ReminderState {
+  PENDING
+  DONE
+  DISMISSED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_OVERDUE
+  LOW_RATING
+  REMINDER_DUE
+  GENERIC
+}
+
+// ─────────────────────────────────────────────────────────────
+// Domain models (SPEC §3)
+// ─────────────────────────────────────────────────────────────
+
+model Client {
+  id               String     @id @default(cuid())
+  name             String
+  phone            String?
+  email            String?
+  whatsapp         String?
+  address          String?
+  preferredChannel Channel?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  vehicles       Vehicle[]
+  orders         Order[]
+  feedback       Feedback[]
+  communications Communication[]
+  reminders      Reminder[]
+
+  @@index([name])
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  clientId  String
+  make      String
+  model     String
+  year      Int
+  plate     String?
+  vin       String?
+  color     String?
+  mileage   Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([clientId])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  clientId      String
+  vehicleId     String
+  description   String
+  receivedDate  DateTime    @default(now())
+  expectedDate  DateTime?
+  status        OrderStatus @default(PENDING)
+  // Required (enforced in action) when status is FAILED or ON_HOLD — CLT-07.
+  statusReason  String?
+  assignedTechId String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  assignedTech  User?           @relation("OrderAssignedTech", fields: [assignedTechId], references: [id], onDelete: SetNull)
+  parts         Part[]
+  feedback      Feedback[]
+  communications Communication[]
+  reminders     Reminder[]
+
+  @@index([clientId])
+  @@index([vehicleId])
+  @@index([assignedTechId])
+  @@index([status])
+}
+
+model Part {
+  id           String           @id @default(cuid())
+  orderId      String
+  name         String
+  availability PartAvailability @default(NOT_AVAILABLE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Feedback {
+  id          String   @id @default(cuid())
+  clientId    String
+  orderId     String?
+  rating      Int // 1–5
+  comments    String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  order     Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User   @relation("FeedbackCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([orderId])
+  @@index([createdById])
+}
+
+model Communication {
+  id        String             @id @default(cuid())
+  clientId  String
+  orderId   String?
+  channel   Channel
+  type      CommunicationType
+  state     CommunicationState @default(DRAFT)
+  content   String
+  senderId  String
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  sender User   @relation("CommunicationSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([orderId])
+  @@index([senderId])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime // the work day
+  dueDate     DateTime?
+  status      TaskStatus   @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
+  assigneeId  String
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  assignee  User @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  createdBy User @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([assigneeId])
+  @@index([createdById])
+  @@index([status])
+  @@index([date])
+}
+
+model PerformanceReview {
+  id                String   @id @default(cuid())
+  reviewerId        String
+  revieweeId        String
+  cycle             String // e.g. "2026-W21"
+  deliverablesScore Int
+  communicationScore Int
+  comments          String?
+  // Configurable extra criteria stored as JSON for now (PERF-02).
+  extraScores       Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  reviewer User @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, revieweeId, cycle])
+  @@index([revieweeId])
+  @@index([cycle])
+}
+
+model CompanyKPI {
+  id           String   @id @default(cuid())
+  name         String
+  targetValue  Float
+  currentValue Float?
+  unit         String?
+  periodStart  DateTime
+  periodEnd    DateTime
+  autoComputed Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([periodStart, periodEnd])
+}
+
+model Reminder {
+  id         String        @id @default(cuid())
+  type       ReminderType
+  orderId    String?
+  clientId   String?
+  dueAt      DateTime
+  recurrence String?
+  state      ReminderState @default(PENDING)
+  assigneeId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  order    Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("ReminderAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([clientId])
+  @@index([assigneeId])
+  @@index([dueAt])
+  @@index([state])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  userId     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User @relation("UserActivityLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}

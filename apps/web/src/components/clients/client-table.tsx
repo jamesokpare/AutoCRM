@@ -1,0 +1,175 @@
+"use client";
+
+import { OrderStatus } from "@crm-tool/db/enums";
+import { Button } from "@crm-tool/ui/components/button";
+import { Input } from "@crm-tool/ui/components/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm-tool/ui/components/table";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { listClientsAction } from "@/lib/actions/clients";
+import type { ClientListFilters, ClientListRow } from "@/lib/queries/clients";
+
+import { OrderPartsBadge, StatusBadge } from "./status-badge";
+
+type QuickFilter = NonNullable<ClientListFilters["quick"]>;
+
+const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
+  { key: "failed", label: "Failed" },
+  { key: "due_today", label: "Due today" },
+  { key: "parts_not_available", label: "Parts not available" },
+];
+
+function fmtDate(d: Date | string | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/** Picks the order to summarise for a client row: the most recently updated. */
+function primaryOrder(client: ClientListRow): ClientListRow["orders"][number] | undefined {
+  return client.orders[0];
+}
+
+export function ClientTable({
+  initialData,
+  initialFilters = {},
+}: {
+  initialData: ClientListRow[];
+  initialFilters?: ClientListFilters;
+}) {
+  const [search, setSearch] = useState(initialFilters.search ?? "");
+  const [debounced, setDebounced] = useState(initialFilters.search ?? "");
+  const [quick, setQuick] = useState<QuickFilter | undefined>(initialFilters.quick);
+  const [status, setStatus] = useState<OrderStatus | undefined>(initialFilters.status);
+
+  // Debounce the text search to avoid a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const filters: ClientListFilters = {
+    search: debounced || undefined,
+    quick,
+    status,
+  };
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["clients", filters],
+    queryFn: () => listClientsAction(filters),
+    initialData:
+      debounced === (initialFilters.search ?? "") &&
+      quick === initialFilters.quick &&
+      status === initialFilters.status
+        ? initialData
+        : undefined,
+    placeholderData: keepPreviousData,
+    // Inherits refetchOnWindowFocus from the global QueryClient (SPEC §2).
+  });
+
+  const rows = data ?? [];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, contact, or vehicle…"
+          className="h-8 max-w-xs"
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_FILTERS.map((f) => (
+            <Button
+              key={f.key}
+              size="xs"
+              variant={quick === f.key ? "default" : "outline"}
+              onClick={() => setQuick((cur) => (cur === f.key ? undefined : f.key))}
+            >
+              {f.label}
+            </Button>
+          ))}
+          {Object.values(OrderStatus).map((s) => (
+            <Button
+              key={s}
+              size="xs"
+              variant={status === s ? "default" : "outline"}
+              onClick={() => setStatus((cur) => (cur === s ? undefined : s))}
+            >
+              {s.replace("_", " ").toLowerCase()}
+            </Button>
+          ))}
+        </div>
+        {isFetching ? <span className="text-xs text-muted-foreground">Updating…</span> : null}
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Client</TableHead>
+              <TableHead>Vehicle</TableHead>
+              <TableHead>Order</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Parts</TableHead>
+              <TableHead>Expected</TableHead>
+              <TableHead>Tech</TableHead>
+              <TableHead>Last update</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  No clients match these filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((client) => {
+                const order = primaryOrder(client);
+                const vehicle = order?.vehicle ?? client.vehicles[0];
+                return (
+                  <TableRow key={client.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/clients/${client.id}`} className="hover:underline">
+                        {client.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {client.phone ?? client.email ?? ""}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {vehicle
+                        ? `${vehicle.make} ${vehicle.model}${"year" in vehicle ? ` (${vehicle.year})` : ""}`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[16rem] truncate">
+                      {order ? order.description : <span className="text-muted-foreground">No orders</span>}
+                    </TableCell>
+                    <TableCell>{order ? <StatusBadge status={order.status} /> : "—"}</TableCell>
+                    <TableCell>
+                      {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
+                    </TableCell>
+                    <TableCell>{fmtDate(order?.expectedDate ?? null)}</TableCell>
+                    <TableCell>{order?.assignedTech?.name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {fmtDate(order?.updatedAt ?? client.updatedAt)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
