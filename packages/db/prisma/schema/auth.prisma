@@ -9,6 +9,32 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
+  // Better-Auth admin plugin fields
+  role       String?
+  banned     Boolean?
+  banReason  String?
+  banExpires DateTime?
+
+  // CRM profile fields (SPEC §3 — extends Better-Auth user)
+  roles            Role[]  @default([])
+  kpis             String?
+  bottlenecks      String?
+  photo            String?
+  isApproved       Boolean @default(false)
+  profileCompleted Boolean @default(false)
+
+  // Inverse relations to domain models
+  assignedTasks   Task[]              @relation("TaskAssignee")
+  createdTasks    Task[]              @relation("TaskCreatedBy")
+  reviewsGiven    PerformanceReview[] @relation("ReviewsGiven")
+  reviewsReceived PerformanceReview[] @relation("ReviewsReceived")
+  assignedOrders  Order[]             @relation("OrderAssignedTech")
+  notifications   Notification[]      @relation("UserNotifications")
+  activityLogs    ActivityLog[]       @relation("UserActivityLogs")
+  communications  Communication[]     @relation("CommunicationSender")
+  feedback        Feedback[]          @relation("FeedbackCreatedBy")
+  reminders       Reminder[]          @relation("ReminderAssignee")
+
   @@unique([email])
   @@map("user")
 }
