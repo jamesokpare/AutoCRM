@@ -164,14 +164,20 @@ export function TeamBoard({
           ) : (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
               {filtered.map((t) => (
-                <TaskCard key={t.id} task={t} showStatusBadge onChanged={refresh} />
+                <TaskCard
+                  key={t.id}
+                  task={t}
+                  showStatusBadge
+                  currentUserId={currentUserId}
+                  onChanged={refresh}
+                />
               ))}
             </div>
           )}
         </TabsPanel>
 
         <TabsPanel value="kanban" className="pt-3">
-          <KanbanBoard tasks={filtered} onChanged={refresh} />
+          <KanbanBoard tasks={filtered} currentUserId={currentUserId} onChanged={refresh} />
         </TabsPanel>
       </Tabs>
     </div>

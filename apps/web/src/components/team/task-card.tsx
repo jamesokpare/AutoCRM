@@ -3,6 +3,14 @@
 import { TaskStatus } from "@crm-tool/db/enums";
 import { Button } from "@crm-tool/ui/components/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@crm-tool/ui/components/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -10,10 +18,11 @@ import {
   SelectValue,
 } from "@crm-tool/ui/components/select";
 import { cn } from "@crm-tool/ui/lib/utils";
-import { useTransition } from "react";
+import { Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { setTaskStatus } from "@/lib/actions/tasks";
+import { deleteTask, setTaskStatus } from "@/lib/actions/tasks";
 
 import { PersonAvatar } from "./person-avatar";
 import { PriorityBadge, StatusBadge } from "./task-badges";
@@ -34,14 +43,22 @@ function fmtDate(iso: string | null): string {
 export function TaskCard({
   task,
   showStatusBadge = false,
+  currentUserId,
   onChanged,
 }: {
   task: TaskDTO;
   /** Show a status badge inline (used in list/my-week; kanban groups by status). */
   showStatusBadge?: boolean;
+  /** Used to decide whether the delete affordance is shown. */
+  currentUserId?: string;
   onChanged?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePending, startDelete] = useTransition();
+  const canDelete =
+    !!currentUserId &&
+    (task.createdBy.id === currentUserId || task.assignee.id === currentUserId);
 
   const highlight = task.overdue || task.status === TaskStatus.FAILED;
 
@@ -114,6 +131,61 @@ export function TaskCard({
           </SelectContent>
         </Select>
         {pending ? <Button size="xs" variant="ghost" disabled>…</Button> : null}
+
+        {canDelete ? (
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogTrigger
+              render={
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="ml-auto text-muted-foreground hover:text-destructive"
+                  aria-label="Delete task"
+                  title="Delete task"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              }
+            />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete task?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                "{task.title}" will be permanently removed.
+              </p>
+              <DialogFooter>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={deletePending}
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={deletePending}
+                  onClick={() =>
+                    startDelete(async () => {
+                      const res = await deleteTask(task.id);
+                      if (!res.ok) {
+                        toast.error(res.error ?? "Failed to delete task");
+                        return;
+                      }
+                      toast.success("Task deleted");
+                      setDeleteOpen(false);
+                      onChanged?.();
+                    })
+                  }
+                >
+                  {deletePending ? "Deleting…" : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
     </div>
   );
