@@ -2,7 +2,7 @@ import { Button } from "@crm-tool/ui/components/button";
 
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { ClientTable } from "@/components/clients/client-table";
-import { getClientList, getTechnicians } from "@/lib/queries/clients";
+import { getClientList } from "@/lib/queries/clients";
 
 /**
  * CLT / Module B: client directory. Lists all clients with the same searchable
@@ -10,7 +10,7 @@ import { getClientList, getTechnicians } from "@/lib/queries/clients";
  * order — is open to every signed-in team member.
  */
 export default async function ClientsPage() {
-  const [clients, techs] = await Promise.all([getClientList(), getTechnicians()]);
+  const clients = await getClientList();
 
   return (
     <div className="space-y-4">
@@ -21,7 +21,7 @@ export default async function ClientsPage() {
             Search and manage clients, vehicles and service orders.
           </p>
         </div>
-        <ClientIntakeForm techs={techs} trigger={<Button size="sm">New client</Button>} />
+        <ClientIntakeForm trigger={<Button size="sm">New client</Button>} />
       </div>
 
       <ClientTable initialData={clients} />

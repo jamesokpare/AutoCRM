@@ -165,7 +165,9 @@ export function ClientTable({
                       {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
                     </TableCell>
                     <TableCell>{fmtDate(order?.expectedDate ?? null)}</TableCell>
-                    <TableCell>{order?.assignedTech?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {order?.assignedTechName ?? order?.assignedTech?.name ?? "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {fmtDate(order?.updatedAt ?? client.updatedAt)}
                     </TableCell>

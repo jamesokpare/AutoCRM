@@ -236,7 +236,7 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
                 statusReason: REQUIRES_REASON.includes(status) ? statusReason : null,
                 receivedDate: parseDate(form.get("receivedDate")) ?? new Date(),
                 expectedDate: parseDate(form.get("expectedDate")),
-                assignedTechId: str(form.get("assignedTechId")),
+                assignedTechName: str(form.get("assignedTechName")),
                 parts: parts.length ? { create: parts } : undefined,
               },
             }),

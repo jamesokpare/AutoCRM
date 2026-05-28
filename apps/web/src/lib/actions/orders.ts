@@ -88,7 +88,7 @@ export async function createOrder(
 
     const receivedDate = parseDate(form.get("receivedDate")) ?? new Date();
     const expectedDate = parseDate(form.get("expectedDate"));
-    const assignedTechId = str(form.get("assignedTechId"));
+    const assignedTechName = str(form.get("assignedTechName"));
     const partNames = parsePartNames(form);
 
     const order = await withMutation(
@@ -108,7 +108,7 @@ export async function createOrder(
             statusReason: REQUIRES_REASON.includes(status) ? statusReason : null,
             receivedDate,
             expectedDate,
-            assignedTechId,
+            assignedTechName,
             parts: partNames.length
               ? { create: partNames.map((name) => ({ name })) }
               : undefined,
@@ -147,7 +147,7 @@ export async function updateOrder(
             vehicleId: vehicleId ?? undefined,
             expectedDate: parseDate(form.get("expectedDate")),
             receivedDate: parseDate(form.get("receivedDate")) ?? undefined,
-            assignedTechId: str(form.get("assignedTechId")),
+            assignedTechName: str(form.get("assignedTechName")),
           },
         }),
     );

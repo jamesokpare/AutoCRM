@@ -22,7 +22,6 @@ import {
   getClientActivity,
   getClientDetail,
   getFeedbackAggregate,
-  getTechnicians,
 } from "@/lib/queries/clients";
 import { can } from "@/lib/rbac";
 
@@ -64,10 +63,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   if (!client) notFound();
 
   const orderIds = client.orders.map((o) => o.id);
-  const [activity, feedbackAgg, techs] = await Promise.all([
+  const [activity, feedbackAgg] = await Promise.all([
     getClientActivity(client.id, orderIds),
     getFeedbackAggregate(client.id),
-    canEdit ? getTechnicians() : Promise.resolve([] as { id: string; name: string }[]),
   ]);
 
   const vehicleOptions = client.vehicles.map((v) => ({
@@ -198,7 +196,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <OrderForm
               clientId={client.id}
               vehicles={vehicleOptions}
-              techs={techs}
               trigger={<Button size="xs" variant="outline">New order</Button>}
             />
           ) : null}
@@ -220,7 +217,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                         <p className="text-xs text-muted-foreground">
                           {order.vehicle.year} {order.vehicle.make} {order.vehicle.model} · received{" "}
                           {fmt(order.receivedDate)} · expected {fmt(order.expectedDate)} ·{" "}
-                          {order.assignedTech?.name ?? "Unassigned"}
+                          {order.assignedTechName ?? order.assignedTech?.name ?? "Unassigned"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -229,14 +226,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                           <OrderForm
                             clientId={client.id}
                             vehicles={vehicleOptions}
-                            techs={techs}
                             initial={{
                               id: order.id,
                               description: order.description,
                               vehicleId: order.vehicleId,
                               receivedDate: fmtDateInput(order.receivedDate),
                               expectedDate: fmtDateInput(order.expectedDate),
-                              assignedTechId: order.assignedTechId,
+                              assignedTechName: order.assignedTechName,
                             }}
                             trigger={<Button size="xs" variant="outline">Edit</Button>}
                           />

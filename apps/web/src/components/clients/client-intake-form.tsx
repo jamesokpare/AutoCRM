@@ -49,10 +49,8 @@ const selectClass = "h-8 rounded-none border border-input bg-transparent px-2.5 
  * one submission. Open to every signed-in team member.
  */
 export function ClientIntakeForm({
-  techs,
   trigger,
 }: {
-  techs: { id: string; name: string }[];
   trigger: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
@@ -156,15 +154,8 @@ export function ClientIntakeForm({
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="assignedTechId">Technician</Label>
-                <select id="assignedTechId" name="assignedTechId" defaultValue="" className={selectClass}>
-                  <option value="">Unassigned</option>
-                  {techs.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="assignedTechName">Technician</Label>
+                <Input id="assignedTechName" name="assignedTechName" placeholder="Technician name" />
               </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="receivedDate">Received</Label>

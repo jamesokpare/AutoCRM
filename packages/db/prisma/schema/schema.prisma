@@ -184,6 +184,9 @@ model Order {
   // Required (enforced in action) when status is FAILED or ON_HOLD — CLT-07.
   statusReason  String?
   assignedTechId String?
+  // Free-text technician name — used when the technician isn't an app user.
+  // When both fields are set, the free-text name wins in display fallbacks.
+  assignedTechName String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
