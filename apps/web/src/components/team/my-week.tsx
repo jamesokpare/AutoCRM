@@ -65,7 +65,13 @@ export function MyWeek({
               </h2>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {dayTasks.map((t) => (
-                  <TaskCard key={t.id} task={t} showStatusBadge onChanged={refresh} />
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    showStatusBadge
+                    currentUserId={currentUserId}
+                    onChanged={refresh}
+                  />
                 ))}
               </div>
             </div>

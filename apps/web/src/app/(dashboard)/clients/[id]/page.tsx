@@ -6,12 +6,17 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { ApologyDialog } from "@/components/clients/apology-dialog";
+import { ClientDeleteButton, ClientStatusControl } from "@/components/clients/client-actions";
 import { ClientForm } from "@/components/clients/client-form";
 import { ClientUpdateForm } from "@/components/clients/client-update-form";
 import { FeedbackForm } from "@/components/clients/feedback-form";
 import { AddPart, PartControl, StatusControl } from "@/components/clients/order-actions";
 import { OrderForm } from "@/components/clients/order-form";
-import { PartAvailabilityBadge, StatusBadge } from "@/components/clients/status-badge";
+import {
+  ClientStatusBadge,
+  PartAvailabilityBadge,
+  StatusBadge,
+} from "@/components/clients/status-badge";
 import { VehicleForm } from "@/components/clients/vehicle-form";
 import {
   getClientActivity,
@@ -76,7 +81,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">{client.name}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold">{client.name}</h1>
+            <ClientStatusBadge status={client.status} />
+          </div>
           <p className="text-xs text-muted-foreground">
             {[client.phone, client.email, client.whatsapp].filter(Boolean).join(" · ") || "No contact details"}
             {client.preferredChannel ? ` · prefers ${client.preferredChannel}` : ""}
@@ -84,7 +92,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           {client.address ? <p className="text-xs text-muted-foreground">{client.address}</p> : null}
           <p className="text-xs text-muted-foreground">Last updated {fmtDateTime(client.updatedAt)}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit ? (
+            <ClientStatusControl clientId={client.id} current={client.status} />
+          ) : null}
           <FeedbackForm
             clientId={client.id}
             orders={orderChoices}
@@ -103,6 +114,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               }}
               trigger={<Button size="sm" variant="outline">Edit client</Button>}
             />
+          ) : null}
+          {canEdit ? (
+            <ClientDeleteButton clientId={client.id} clientName={client.name} />
           ) : null}
         </div>
       </div>

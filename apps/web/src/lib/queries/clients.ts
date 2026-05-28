@@ -70,6 +70,7 @@ const clientListSelect = {
   name: true,
   phone: true,
   email: true,
+  status: true,
   updatedAt: true,
   vehicles: {
     select: { id: true, make: true, model: true, year: true },

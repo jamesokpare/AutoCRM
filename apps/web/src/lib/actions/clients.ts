@@ -1,7 +1,13 @@
 "use server";
 
 import { auth } from "@crm-tool/auth";
-import { Channel, OrderStatus, PartAvailability, type Role } from "@crm-tool/db";
+import {
+  Channel,
+  ClientStatus,
+  OrderStatus,
+  PartAvailability,
+  type Role,
+} from "@crm-tool/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
@@ -72,6 +78,13 @@ function parseStatus(value: FormDataEntryValue | null): OrderStatus | null {
   const v = str(value);
   if (!v) return null;
   return (Object.values(OrderStatus) as string[]).includes(v) ? (v as OrderStatus) : null;
+}
+
+function parseClientStatus(value: string | null | undefined): ClientStatus | null {
+  if (!value) return null;
+  return (Object.values(ClientStatus) as string[]).includes(value)
+    ? (value as ClientStatus)
+    : null;
 }
 
 function parseAvailability(value: string): PartAvailability {
@@ -235,6 +248,78 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
     revalidatePath("/clients");
     revalidatePath("/dashboard");
     return { ok: true, data: { id: client.id } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Change a client's relationship status (PROSPECT/ACTIVE/INACTIVE/ARCHIVED). */
+export async function setClientStatus(
+  clientId: string,
+  status: ClientStatus,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await requireEdit();
+    const parsed = parseClientStatus(status);
+    if (!parsed) return { ok: false, error: "Invalid client status." };
+
+    const current = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, status: true },
+    });
+    if (!current) return { ok: false, error: "Client not found." };
+
+    await withMutation(
+      {
+        entityType: "Client",
+        action: "status_changed",
+        userId: user.id,
+        entityId: clientId,
+        metadata: { from: current.status, to: parsed },
+      },
+      async () => prisma.client.update({ where: { id: clientId }, data: { status: parsed } }),
+    );
+
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { id: clientId } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Delete a client and all dependent rows (vehicles, orders, parts, feedback,
+ * communications, reminders, daily updates — cascaded by the schema). The
+ * audit log entry is written before deletion so the trail survives.
+ */
+export async function deleteClient(clientId: string): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await requireEdit();
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, name: true },
+    });
+    if (!client) return { ok: false, error: "Client not found." };
+
+    // Log the deletion first — the cascade removes the client row, but the
+    // ActivityLog entry persists (no FK to Client).
+    await prisma.activityLog.create({
+      data: {
+        entityType: "Client",
+        entityId: clientId,
+        action: "deleted",
+        userId: user.id,
+        metadata: { name: client.name },
+      },
+    });
+
+    await prisma.client.delete({ where: { id: clientId } });
+
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { id: clientId } };
   } catch (err) {
     return fail(err);
   }

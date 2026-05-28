@@ -28,6 +28,13 @@ enum OrderStatus {
   ON_HOLD
 }
 
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum PartAvailability {
   AVAILABLE
   NOT_AVAILABLE
@@ -92,15 +99,16 @@ enum NotificationType {
 // ─────────────────────────────────────────────────────────────
 
 model Client {
-  id               String     @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
   phone            String?
   email            String?
   whatsapp         String?
   address          String?
   preferredChannel Channel?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  status           ClientStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   vehicles       Vehicle[]
   orders         Order[]
