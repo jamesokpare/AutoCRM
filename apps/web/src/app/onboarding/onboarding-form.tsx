@@ -3,6 +3,7 @@
 import { Role } from "@crm-tool/db/enums";
 import { Button } from "@crm-tool/ui/components/button";
 import { Checkbox } from "@crm-tool/ui/components/checkbox";
+import { Input } from "@crm-tool/ui/components/input";
 import { Label } from "@crm-tool/ui/components/label";
 import { Textarea } from "@crm-tool/ui/components/textarea";
 import { useForm } from "@tanstack/react-form";
@@ -20,7 +21,10 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 ];
 
 const schema = z.object({
-  roles: z.array(z.enum(Object.values(Role) as [Role, ...Role[]])).min(1, "Select at least one role"),
+  jobTitle: z.string().trim().min(1, "Tell us what your role is"),
+  roles: z
+    .array(z.enum(Object.values(Role) as [Role, ...Role[]]))
+    .min(1, "Pick at least one access level"),
   kpis: z.string(),
   bottlenecks: z.string(),
 });
@@ -28,6 +32,7 @@ const schema = z.object({
 export function OnboardingForm() {
   const form = useForm({
     defaultValues: {
+      jobTitle: "",
       roles: [] as Role[],
       kpis: "",
       bottlenecks: "",
@@ -37,6 +42,7 @@ export function OnboardingForm() {
       // On success the server action redirects to /dashboard; it only returns a
       // result here when validation fails.
       const res = await completeProfile({
+        jobTitle: value.jobTitle,
         roles: value.roles,
         kpis: value.kpis,
         bottlenecks: value.bottlenecks,
@@ -56,10 +62,37 @@ export function OnboardingForm() {
       }}
       className="space-y-6"
     >
+      <form.Field name="jobTitle">
+        {(field) => (
+          <div className="space-y-2">
+            <Label htmlFor={field.name}>Your role</Label>
+            <Input
+              id={field.name}
+              name={field.name}
+              placeholder="e.g. Lead mechanic, Front desk, Service writer"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Describe what you do in your own words — this is what teammates see.
+            </p>
+            {field.state.meta.errors.map((error) => (
+              <p key={error?.message} className="text-xs text-destructive">
+                {error?.message}
+              </p>
+            ))}
+          </div>
+        )}
+      </form.Field>
+
       <form.Field name="roles">
         {(field) => (
           <div className="space-y-2">
-            <Label>Role(s)</Label>
+            <Label>Access level</Label>
+            <p className="text-xs text-muted-foreground">
+              Pick the one(s) that match your responsibilities — controls what you can edit.
+            </p>
             <div className="flex flex-col gap-2">
               {ROLE_OPTIONS.map((opt) => {
                 const checked = field.state.value.includes(opt.value);

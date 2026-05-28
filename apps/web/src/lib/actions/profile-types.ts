@@ -12,6 +12,8 @@ import type { Role } from "@crm-tool/db";
 export interface UpdateProfileInput {
   name: string;
   roles: Role[];
+  /** Free-text role / job title written by the employee. */
+  jobTitle?: string | null;
   photo?: string | null;
   kpis?: string | null;
   bottlenecks?: string | null;

@@ -23,7 +23,15 @@ export default async function ProfilePage() {
 
   const me = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, roles: true, photo: true, kpis: true, bottlenecks: true },
+    select: {
+      id: true,
+      name: true,
+      roles: true,
+      jobTitle: true,
+      photo: true,
+      kpis: true,
+      bottlenecks: true,
+    },
   });
   if (!me) redirect("/login");
 
@@ -51,6 +59,7 @@ export default async function ProfilePage() {
               initial={{
                 name: me.name,
                 roles,
+                jobTitle: me.jobTitle,
                 photo: me.photo,
                 kpis: me.kpis,
                 bottlenecks: me.bottlenecks,
