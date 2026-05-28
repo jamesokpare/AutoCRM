@@ -19,5 +19,11 @@ export default async function AttendancePage() {
     getMyOpenAttendance(session.user.id),
   ]);
 
-  return <AttendancePanel initialRows={rows} initiallyClockedIn={open !== null} />;
+  return (
+    <AttendancePanel
+      initialRows={rows}
+      currentUserId={session.user.id}
+      initiallyClockedIn={open !== null}
+    />
+  );
 }
