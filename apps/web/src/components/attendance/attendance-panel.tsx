@@ -4,7 +4,7 @@ import { Button } from "@crm-tool/ui/components/button";
 import { Card } from "@crm-tool/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { LogIn, LogOut } from "lucide-react";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { clockIn, clockOut, fetchTodayAttendance } from "@/lib/actions/attendance";
@@ -22,9 +22,11 @@ function fmtTime(d: Date | string): string {
 
 export function AttendancePanel({
   initialRows,
+  currentUserId,
   initiallyClockedIn,
 }: {
   initialRows: AttendanceRow[];
+  currentUserId: string;
   initiallyClockedIn: boolean;
 }) {
   const { data: rows = initialRows, refetch } = useQuery({
@@ -34,11 +36,18 @@ export function AttendancePanel({
   });
 
   const [pending, startTransition] = useTransition();
-  // Derive clock state from the live data when available, falling back to the
-  // server-rendered value: an open (clockOut === null) row means clocked in.
-  const myOpen = rows.some((r) => r.clockOut === null) || initiallyClockedIn;
+  const [myOpen, setMyOpen] = useState(initiallyClockedIn);
 
-  function act(fn: typeof clockIn, label: string) {
+  // Keep myOpen in sync with refetched rows for the current user. A shift that
+  // started on a previous WAT day won't appear in today's rows, so only flip
+  // state when we actually see one of the user's rows.
+  useEffect(() => {
+    const mine = rows.filter((r) => r.userId === currentUserId);
+    if (mine.length === 0) return;
+    setMyOpen(mine.some((r) => r.clockOut === null));
+  }, [rows, currentUserId]);
+
+  function act(fn: typeof clockIn, label: string, nextOpen: boolean) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
@@ -46,6 +55,7 @@ export function AttendancePanel({
         return;
       }
       toast.success(label);
+      setMyOpen(nextOpen);
       refetch();
     });
   }
@@ -61,14 +71,18 @@ export function AttendancePanel({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" disabled={pending} onClick={() => act(clockIn, "Clocked in")}>
+          <Button
+            size="sm"
+            disabled={pending || myOpen}
+            onClick={() => act(clockIn, "Clocked in", true)}
+          >
             <LogIn className="size-4" /> Clock in
           </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={pending}
-            onClick={() => act(clockOut, "Clocked out")}
+            disabled={pending || !myOpen}
+            onClick={() => act(clockOut, "Clocked out", false)}
           >
             <LogOut className="size-4" /> Clock out
           </Button>
