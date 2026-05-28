@@ -24,15 +24,20 @@ export function AttendancePanel({
   initialRows,
   currentUserId,
   initiallyClockedIn,
+  loadError = null,
 }: {
   initialRows: AttendanceRow[];
   currentUserId: string;
   initiallyClockedIn: boolean;
+  loadError?: string | null;
 }) {
   const { data: rows = initialRows, refetch } = useQuery({
     queryKey: ["attendance-today"],
     queryFn: () => fetchTodayAttendance(),
     initialData: initialRows,
+    // If the initial load already failed (e.g. table missing on prod), don't
+    // immediately retry the same query and overwrite the empty fallback.
+    enabled: !loadError,
   });
 
   const [pending, startTransition] = useTransition();
@@ -73,7 +78,7 @@ export function AttendancePanel({
         <div className="flex gap-2">
           <Button
             size="sm"
-            disabled={pending || myOpen}
+            disabled={pending || myOpen || !!loadError}
             onClick={() => act(clockIn, "Clocked in", true)}
           >
             <LogIn className="size-4" /> Clock in
@@ -81,7 +86,7 @@ export function AttendancePanel({
           <Button
             size="sm"
             variant="outline"
-            disabled={pending || !myOpen}
+            disabled={pending || !myOpen || !!loadError}
             onClick={() => act(clockOut, "Clocked out", false)}
           >
             <LogOut className="size-4" /> Clock out
@@ -89,9 +94,21 @@ export function AttendancePanel({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {myOpen ? "You are currently clocked in." : "You are not clocked in."}
-      </p>
+      {loadError ? (
+        <Card className="border-destructive/50 bg-destructive/5 p-3 text-xs">
+          <p className="font-medium text-destructive">Attendance unavailable</p>
+          <p className="mt-1 text-muted-foreground">
+            Could not load attendance data. The schema may be out of date on this
+            environment — run <code className="font-mono">pnpm db:push</code> against the
+            production database.
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground/80">{loadError}</p>
+        </Card>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {myOpen ? "You are currently clocked in." : "You are not clocked in."}
+        </p>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Today · {formatWatDate(new Date())}</h2>
