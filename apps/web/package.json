@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
-    "build": "next build",
+    "build": "pnpm --filter @crm-tool/db exec prisma db push && next build",
     "start": "next start",
     "check-types": "tsc --noEmit"
   },
