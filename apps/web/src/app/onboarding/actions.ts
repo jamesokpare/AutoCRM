@@ -39,6 +39,7 @@ export async function completeProfile(input: CompleteProfileInput): Promise<Comp
         where: { id: userId },
         data: {
           roles,
+          jobTitle: input.jobTitle?.trim() || null,
           kpis: input.kpis?.trim() || null,
           bottlenecks: input.bottlenecks?.trim() || null,
           profileCompleted: true,
