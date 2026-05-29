@@ -216,6 +216,86 @@ export async function setOrderStatus(
   }
 }
 
+/**
+ * Sets an order's expected date to "now", so it lands in the dashboard's
+ * "Due today" filter (which buckets orders whose expectedDate falls on the
+ * current WAT calendar day). Surfaced as a "Due today" choice on the order
+ * status dropdown — "due today" is derived from the date, not a stored status.
+ */
+export async function markOrderDueToday(orderId: string): Promise<ActionResult> {
+  try {
+    const user = await getSessionUser();
+    requireAuth(user ? { user } : null);
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { clientId: true },
+    });
+    if (!order) return { ok: false, error: "Order not found." };
+
+    await withMutation(
+      { entityType: "Order", action: "marked_due_today", userId: user!.id, entityId: orderId },
+      async () =>
+        prisma.order.update({ where: { id: orderId }, data: { expectedDate: new Date() } }),
+    );
+
+    revalidatePath(`/clients/${order.clientId}`);
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Marks the order as awaiting parts, so it lands in the dashboard's "Parts not
+ * available" filter (which matches orders having any part set NOT_AVAILABLE).
+ * Existing parts are all flipped to NOT_AVAILABLE; if the order has no parts
+ * yet, a placeholder one is created so the state is representable. Requires the
+ * `update_parts` capability, like the other parts actions.
+ */
+export async function markOrderPartsNotAvailable(orderId: string): Promise<ActionResult> {
+  try {
+    const user = await getSessionUser();
+    requirePermission(user ? { user } : null, "update_parts");
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { clientId: true, parts: { select: { id: true } } },
+    });
+    if (!order) return { ok: false, error: "Order not found." };
+
+    await withMutation(
+      {
+        entityType: "Order",
+        action: "parts_marked_unavailable",
+        userId: user!.id,
+        entityId: orderId,
+        metadata: { partCount: order.parts.length },
+      },
+      async () =>
+        order.parts.length > 0
+          ? prisma.part.updateMany({
+              where: { orderId },
+              data: { availability: PartAvailability.NOT_AVAILABLE },
+            })
+          : prisma.part.create({
+              data: {
+                orderId,
+                name: "Awaiting part",
+                availability: PartAvailability.NOT_AVAILABLE,
+              },
+            }),
+    );
+
+    revalidatePath(`/clients/${order.clientId}`);
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // Parts (CLT-08) — update_parts capability
 // ─────────────────────────────────────────────────────────────
