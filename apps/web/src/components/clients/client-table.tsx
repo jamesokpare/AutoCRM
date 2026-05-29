@@ -4,6 +4,13 @@ import { OrderStatus } from "@crm-tool/db/enums";
 import { Button } from "@crm-tool/ui/components/button";
 import { Input } from "@crm-tool/ui/components/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm-tool/ui/components/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,6 +34,22 @@ const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "failed", label: "Failed" },
   { key: "due_today", label: "Due today" },
   { key: "parts_not_available", label: "Parts not available" },
+];
+
+const STATUS_LABEL: Record<OrderStatus, string> = {
+  PENDING: "Pending",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+  ON_HOLD: "On Hold",
+};
+
+// "All statuses" clears the order-status filter (the dropdown can't be left
+// blank once opened, so we model "no filter" as an explicit option).
+const STATUS_ALL = "ALL";
+const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: STATUS_ALL, label: "All statuses" },
+  ...Object.values(OrderStatus).map((s) => ({ value: s, label: STATUS_LABEL[s] })),
 ];
 
 function fmtDate(d: Date | string | null): string {
@@ -98,16 +121,24 @@ export function ClientTable({
               {f.label}
             </Button>
           ))}
-          {Object.values(OrderStatus).map((s) => (
-            <Button
-              key={s}
-              size="xs"
-              variant={status === s ? "default" : "outline"}
-              onClick={() => setStatus((cur) => (cur === s ? undefined : s))}
-            >
-              {s.replace("_", " ").toLowerCase()}
-            </Button>
-          ))}
+          <Select
+            items={STATUS_FILTER_OPTIONS}
+            value={status ?? STATUS_ALL}
+            onValueChange={(value) =>
+              setStatus(value === STATUS_ALL ? undefined : (value as OrderStatus))
+            }
+          >
+            <SelectTrigger className="h-8 w-40" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {isFetching ? <span className="text-xs text-muted-foreground">Updating…</span> : null}
       </div>
