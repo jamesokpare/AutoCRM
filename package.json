@@ -14,7 +14,8 @@
     "db:push": "turbo -F @crm-tool/db db:push",
     "db:studio": "turbo -F @crm-tool/db db:studio",
     "db:generate": "turbo -F @crm-tool/db db:generate",
-    "db:migrate": "turbo -F @crm-tool/db db:migrate"
+    "db:migrate": "turbo -F @crm-tool/db db:migrate",
+    "db:migrate:deploy": "turbo -F @crm-tool/db db:migrate:deploy"
   },
   "dependencies": {
     "@crm-tool/env": "workspace:*",
