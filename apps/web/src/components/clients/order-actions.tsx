@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from "@crm-tool/ui/components/dialog";
 import { Label } from "@crm-tool/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm-tool/ui/components/select";
 import { Textarea } from "@crm-tool/ui/components/textarea";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -29,10 +36,16 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 const REQUIRES_REASON: OrderStatus[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];
 
+// Enum declaration order (Pending → In Progress → Completed → Failed → On Hold).
+const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = Object.values(OrderStatus).map(
+  (value) => ({ value, label: STATUS_LABEL[value] }),
+);
+
 /**
  * CLT-07 status control. Requires `update_job_status` (caller decides whether
- * to render it). A reason is collected and required when moving to FAILED or
- * ON_HOLD — the action also enforces this server-side.
+ * to render it). Rendered as a dropdown toggle. A reason is collected and
+ * required when moving to FAILED or ON_HOLD — the action also enforces this
+ * server-side.
  */
 export function StatusControl({
   orderId,
@@ -73,19 +86,22 @@ export function StatusControl({
 
   return (
     <>
-      <div className="flex flex-wrap gap-1">
-        {Object.values(OrderStatus).map((s) => (
-          <Button
-            key={s}
-            size="xs"
-            variant={s === current ? "default" : "outline"}
-            disabled={pending}
-            onClick={() => onPick(s)}
-          >
-            {STATUS_LABEL[s]}
-          </Button>
-        ))}
-      </div>
+      <Select
+        items={STATUS_OPTIONS}
+        value={current}
+        onValueChange={(value) => onPick(value as OrderStatus)}
+      >
+        <SelectTrigger className="h-8 w-40" disabled={pending} aria-label="Job status">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUS_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <Dialog open={reasonOpen} onOpenChange={setReasonOpen}>
         <DialogContent>
