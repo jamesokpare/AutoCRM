@@ -39,6 +39,10 @@
       "persistent": true,
       "env": ["DATABASE_URL", "DATABASE_URL_DIRECT"]
     },
+    "db:migrate:deploy": {
+      "cache": false,
+      "env": ["DATABASE_URL", "DATABASE_URL_DIRECT"]
+    },
     "db:studio": {
       "cache": false,
       "persistent": true,
