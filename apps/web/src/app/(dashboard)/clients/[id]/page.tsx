@@ -14,6 +14,7 @@ import { AddPart, PartControl, StatusControl } from "@/components/clients/order-
 import { OrderForm } from "@/components/clients/order-form";
 import {
   ClientStatusBadge,
+  DueTodayBadge,
   PartAvailabilityBadge,
   StatusBadge,
 } from "@/components/clients/status-badge";
@@ -221,6 +222,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        <DueTodayBadge expectedDate={order.expectedDate} status={order.status} />
                         <StatusBadge status={order.status} />
                         {canEdit ? (
                           <OrderForm

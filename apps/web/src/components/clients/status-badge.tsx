@@ -1,6 +1,9 @@
 import { ClientStatus, OrderStatus, PartAvailability } from "@crm-tool/db/enums";
 import { Badge } from "@crm-tool/ui/components/badge";
 import { cn } from "@crm-tool/ui/lib/utils";
+import { CalendarClock } from "lucide-react";
+
+import { bucketByDueAt } from "@/components/ops/wat";
 
 /**
  * DASH-02 colour-coded order status badge.
@@ -33,6 +36,36 @@ export function StatusBadge({ status, className }: { status: OrderStatus; classN
     >
       {STATUS_LABEL[status]}
     </span>
+  );
+}
+
+// A "due today" nudge only makes sense while the job is still open — a
+// completed or failed order is no longer waiting on anyone.
+const DUE_TODAY_IRRELEVANT: OrderStatus[] = [OrderStatus.COMPLETED, OrderStatus.FAILED];
+
+/**
+ * "Due today" indicator for an order. Renders only when the order's expected
+ * date falls on the current WAT calendar day (SPEC §7) and the job is still
+ * open. Returns null otherwise so it can be dropped inline next to the status.
+ */
+export function DueTodayBadge({
+  expectedDate,
+  status,
+  className,
+}: {
+  expectedDate: Date | string | null;
+  status: OrderStatus;
+  className?: string;
+}) {
+  if (!expectedDate) return null;
+  if (DUE_TODAY_IRRELEVANT.includes(status)) return null;
+  if (bucketByDueAt(new Date(expectedDate)) !== "today") return null;
+
+  return (
+    <Badge variant="warning" className={cn("gap-1", className)}>
+      <CalendarClock className="size-3" />
+      Due today
+    </Badge>
   );
 }
 
