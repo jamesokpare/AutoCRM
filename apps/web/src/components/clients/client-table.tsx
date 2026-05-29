@@ -18,7 +18,8 @@ import { useEffect, useState } from "react";
 import { listClientsAction } from "@/lib/actions/clients";
 import type { ClientListFilters, ClientListRow } from "@/lib/queries/clients";
 
-import { OrderPartsBadge, StatusBadge } from "./status-badge";
+import { ClientRowDeleteButton } from "./client-actions";
+import { ClientStatusBadge, OrderPartsBadge, StatusBadge } from "./status-badge";
 
 type QuickFilter = NonNullable<ClientListFilters["quick"]>;
 
@@ -116,6 +117,7 @@ export function ClientTable({
           <TableHeader>
             <TableRow>
               <TableHead>Client</TableHead>
+              <TableHead>Client status</TableHead>
               <TableHead>Vehicle</TableHead>
               <TableHead>Order</TableHead>
               <TableHead>Status</TableHead>
@@ -123,12 +125,13 @@ export function ClientTable({
               <TableHead>Expected</TableHead>
               <TableHead>Tech</TableHead>
               <TableHead>Last update</TableHead>
+              <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={10} className="text-center text-muted-foreground">
                   No clients match these filters.
                 </TableCell>
               </TableRow>
@@ -147,6 +150,9 @@ export function ClientTable({
                       </div>
                     </TableCell>
                     <TableCell>
+                      <ClientStatusBadge status={client.status} />
+                    </TableCell>
+                    <TableCell>
                       {vehicle
                         ? `${vehicle.make} ${vehicle.model}${"year" in vehicle ? ` (${vehicle.year})` : ""}`
                         : "—"}
@@ -159,9 +165,14 @@ export function ClientTable({
                       {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
                     </TableCell>
                     <TableCell>{fmtDate(order?.expectedDate ?? null)}</TableCell>
-                    <TableCell>{order?.assignedTech?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {order?.assignedTechName ?? order?.assignedTech?.name ?? "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {fmtDate(order?.updatedAt ?? client.updatedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ClientRowDeleteButton clientId={client.id} clientName={client.name} />
                     </TableCell>
                   </TableRow>
                 );

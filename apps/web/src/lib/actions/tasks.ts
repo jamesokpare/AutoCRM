@@ -109,6 +109,48 @@ export async function createTask(input: CreateTaskInput): Promise<TaskActionResu
 }
 
 /**
+ * Delete a task. Allowed for the creator or the assignee (the user wants to
+ * delete "a task that you create or that you assign to someone").
+ */
+export async function deleteTask(taskId: string): Promise<TaskActionResult> {
+  const user = await getSessionUser();
+  try {
+    if (!user) throw new PermissionError("UNAUTHENTICATED", "You must be signed in.");
+    if (!taskId) return { ok: false, error: "Missing task." };
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, createdById: true, assigneeId: true, title: true },
+    });
+    if (!task) return { ok: false, error: "Task not found." };
+
+    if (task.createdById !== user.id && task.assigneeId !== user.id) {
+      return { ok: false, error: "Only the creator or assignee can delete this task." };
+    }
+
+    // Write the audit log first — Task has no FK from ActivityLog so this row
+    // survives deletion.
+    await prisma.activityLog.create({
+      data: {
+        entityType: "Task",
+        entityId: taskId,
+        action: "deleted",
+        userId: user.id,
+        metadata: { title: task.title },
+      },
+    });
+
+    await prisma.task.delete({ where: { id: taskId } });
+
+    revalidatePath("/team");
+    revalidatePath("/tasks");
+    return { ok: true, taskId };
+  } catch (err) {
+    return asResult(err);
+  }
+}
+
+/**
  * ACC-02 (status updates on the board). Anyone with `create_assign_tasks` may
  * move a task through Pending → In Progress → Completed/Failed. Status is
  * preserved on carry-over (we never reset it).

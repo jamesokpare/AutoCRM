@@ -1,4 +1,4 @@
-import { OrderStatus, PartAvailability } from "@crm-tool/db/enums";
+import { ClientStatus, OrderStatus, PartAvailability } from "@crm-tool/db/enums";
 import { Badge } from "@crm-tool/ui/components/badge";
 import { cn } from "@crm-tool/ui/lib/utils";
 
@@ -50,6 +50,40 @@ const PART_VARIANT: Record<PartAvailability, "success" | "warning" | "destructiv
 
 export function PartAvailabilityBadge({ availability }: { availability: PartAvailability }) {
   return <Badge variant={PART_VARIANT[availability]}>{PART_LABEL[availability]}</Badge>;
+}
+
+const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = {
+  PROSPECT: "Prospect",
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  ARCHIVED: "Archived",
+};
+
+const CLIENT_STATUS_CLASS: Record<ClientStatus, string> = {
+  PROSPECT: "border-transparent bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  ACTIVE: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  INACTIVE: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  ARCHIVED: "border-transparent bg-muted text-muted-foreground",
+};
+
+export function ClientStatusBadge({
+  status,
+  className,
+}: {
+  status: ClientStatus;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit shrink-0 items-center rounded-none px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        CLIENT_STATUS_CLASS[status],
+        className,
+      )}
+    >
+      {CLIENT_STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 /** Aggregate parts availability for an order's whole parts list (DASH column). */

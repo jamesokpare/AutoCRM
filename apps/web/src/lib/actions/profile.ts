@@ -53,6 +53,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<ProfileA
           name,
           roles,
           photo,
+          jobTitle: input.jobTitle?.trim() || null,
           kpis: input.kpis?.trim() || null,
           bottlenecks: input.bottlenecks?.trim() || null,
         },

@@ -6,6 +6,7 @@ import { Separator } from "@crm-tool/ui/components/separator";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@crm-tool/ui/components/sheet";
 import {
   Bell,
+  BarChart3,
   Briefcase,
   ClipboardList,
   Clock,
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { href: "/team", label: "Team", icon: Users },
   { href: "/reviews", label: "Reviews", icon: ClipboardList },
   { href: "/kpi", label: "KPI Board", icon: Gauge },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/reminders", label: "Reminders", icon: Star },
   { href: "/attendance", label: "Attendance", icon: Clock },
   { href: "/notifications", label: "Notifications", icon: Bell },

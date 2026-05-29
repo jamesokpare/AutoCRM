@@ -13,6 +13,9 @@ export default defineConfig({
     path: path.join("prisma", "migrations"),
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Prefer the direct (unpooled) connection for schema operations — Neon's
+    // pgbouncer pooled URL doesn't support the long-running session that
+    // `prisma db push` / `migrate` needs.
+    url: process.env.DATABASE_URL_DIRECT ? env("DATABASE_URL_DIRECT") : env("DATABASE_URL"),
   },
 });

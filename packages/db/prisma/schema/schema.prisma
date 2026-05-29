@@ -28,6 +28,13 @@ enum OrderStatus {
   ON_HOLD
 }
 
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum PartAvailability {
   AVAILABLE
   NOT_AVAILABLE
@@ -92,15 +99,16 @@ enum NotificationType {
 // ─────────────────────────────────────────────────────────────
 
 model Client {
-  id               String     @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
   phone            String?
   email            String?
   whatsapp         String?
   address          String?
   preferredChannel Channel?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  status           ClientStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   vehicles       Vehicle[]
   orders         Order[]
@@ -176,6 +184,9 @@ model Order {
   // Required (enforced in action) when status is FAILED or ON_HOLD — CLT-07.
   statusReason  String?
   assignedTechId String?
+  // Free-text technician name — used when the technician isn't an app user.
+  // When both fields are set, the free-text name wins in display fallbacks.
+  assignedTechName String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

@@ -11,6 +11,8 @@ import type { Role } from "@crm-tool/db";
 
 export interface CompleteProfileInput {
   roles: Role[];
+  /** Free-text role / job title in the employee's own words. */
+  jobTitle: string;
   kpis: string;
   bottlenecks: string;
 }

@@ -17,7 +17,15 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
  * ACC-02/03 Kanban view: Pending → In Progress → Completed / Failed. Status
  * changes happen via each card's status select (no DnD this phase).
  */
-export function KanbanBoard({ tasks, onChanged }: { tasks: TaskDTO[]; onChanged?: () => void }) {
+export function KanbanBoard({
+  tasks,
+  currentUserId,
+  onChanged,
+}: {
+  tasks: TaskDTO[];
+  currentUserId?: string;
+  onChanged?: () => void;
+}) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       {COLUMNS.map((col) => {
@@ -34,7 +42,14 @@ export function KanbanBoard({ tasks, onChanged }: { tasks: TaskDTO[]; onChanged?
               {colTasks.length === 0 ? (
                 <p className="py-4 text-center text-xs text-muted-foreground">No tasks</p>
               ) : (
-                colTasks.map((t) => <TaskCard key={t.id} task={t} onChanged={onChanged} />)
+                colTasks.map((t) => (
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    currentUserId={currentUserId}
+                    onChanged={onChanged}
+                  />
+                ))
               )}
             </div>
           </div>
