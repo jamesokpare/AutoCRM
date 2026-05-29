@@ -23,10 +23,12 @@
     "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "catalog:",
     "dotenv": "catalog:",
+    "ws": "^8.18.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@crm-tool/config": "workspace:*",
+    "@types/ws": "^8.5.13",
     "prisma": "^7.8.0",
     "typescript": "catalog:"
   }

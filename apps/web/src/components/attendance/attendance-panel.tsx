@@ -4,7 +4,7 @@ import { Button } from "@crm-tool/ui/components/button";
 import { Card } from "@crm-tool/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { LogIn, LogOut } from "lucide-react";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { clockIn, clockOut, fetchTodayAttendance } from "@/lib/actions/attendance";
@@ -22,23 +22,37 @@ function fmtTime(d: Date | string): string {
 
 export function AttendancePanel({
   initialRows,
+  currentUserId,
   initiallyClockedIn,
+  loadError = null,
 }: {
   initialRows: AttendanceRow[];
+  currentUserId: string;
   initiallyClockedIn: boolean;
+  loadError?: string | null;
 }) {
   const { data: rows = initialRows, refetch } = useQuery({
     queryKey: ["attendance-today"],
     queryFn: () => fetchTodayAttendance(),
     initialData: initialRows,
+    // If the initial load already failed (e.g. table missing on prod), don't
+    // immediately retry the same query and overwrite the empty fallback.
+    enabled: !loadError,
   });
 
   const [pending, startTransition] = useTransition();
-  // Derive clock state from the live data when available, falling back to the
-  // server-rendered value: an open (clockOut === null) row means clocked in.
-  const myOpen = rows.some((r) => r.clockOut === null) || initiallyClockedIn;
+  const [myOpen, setMyOpen] = useState(initiallyClockedIn);
 
-  function act(fn: typeof clockIn, label: string) {
+  // Keep myOpen in sync with refetched rows for the current user. A shift that
+  // started on a previous WAT day won't appear in today's rows, so only flip
+  // state when we actually see one of the user's rows.
+  useEffect(() => {
+    const mine = rows.filter((r) => r.userId === currentUserId);
+    if (mine.length === 0) return;
+    setMyOpen(mine.some((r) => r.clockOut === null));
+  }, [rows, currentUserId]);
+
+  function act(fn: typeof clockIn, label: string, nextOpen: boolean) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
@@ -46,6 +60,7 @@ export function AttendancePanel({
         return;
       }
       toast.success(label);
+      setMyOpen(nextOpen);
       refetch();
     });
   }
@@ -61,23 +76,39 @@ export function AttendancePanel({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" disabled={pending} onClick={() => act(clockIn, "Clocked in")}>
+          <Button
+            size="sm"
+            disabled={pending || myOpen || !!loadError}
+            onClick={() => act(clockIn, "Clocked in", true)}
+          >
             <LogIn className="size-4" /> Clock in
           </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={pending}
-            onClick={() => act(clockOut, "Clocked out")}
+            disabled={pending || !myOpen || !!loadError}
+            onClick={() => act(clockOut, "Clocked out", false)}
           >
             <LogOut className="size-4" /> Clock out
           </Button>
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {myOpen ? "You are currently clocked in." : "You are not clocked in."}
-      </p>
+      {loadError ? (
+        <Card className="border-destructive/50 bg-destructive/5 p-3 text-xs">
+          <p className="font-medium text-destructive">Attendance unavailable</p>
+          <p className="mt-1 text-muted-foreground">
+            Could not load attendance data. The schema may be out of date on this
+            environment — run <code className="font-mono">pnpm db:push</code> against the
+            production database.
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground/80">{loadError}</p>
+        </Card>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {myOpen ? "You are currently clocked in." : "You are not clocked in."}
+        </p>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Today · {formatWatDate(new Date())}</h2>

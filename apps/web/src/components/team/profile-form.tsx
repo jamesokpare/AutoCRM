@@ -23,6 +23,7 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 export interface ProfileFormValues {
   name: string;
   roles: Role[];
+  jobTitle: string | null;
   photo: string | null;
   kpis: string | null;
   bottlenecks: string | null;
@@ -34,6 +35,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormValues }) {
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState(initial.name);
+  const [jobTitle, setJobTitle] = useState(initial.jobTitle ?? "");
   const [roles, setRoles] = useState<Role[]>(initial.roles);
   const [photo, setPhoto] = useState(initial.photo ?? "");
   const [kpis, setKpis] = useState(initial.kpis ?? "");
@@ -45,7 +47,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormValues }) {
       onSubmit={(e) => {
         e.preventDefault();
         startTransition(async () => {
-          const res = await updateProfile({ name, roles, photo, kpis, bottlenecks });
+          const res = await updateProfile({ name, roles, jobTitle, photo, kpis, bottlenecks });
           if (!res.ok) {
             toast.error(res.error ?? "Could not save profile");
             return;
@@ -60,8 +62,24 @@ export function ProfileForm({ initial }: { initial: ProfileFormValues }) {
         <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
 
+      <div className="space-y-1.5">
+        <Label htmlFor="profile-jobtitle">Your role</Label>
+        <Input
+          id="profile-jobtitle"
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
+          placeholder="e.g. Lead mechanic, Front desk, Service writer"
+        />
+        <p className="text-xs text-muted-foreground">
+          What you do in your own words — shown to teammates.
+        </p>
+      </div>
+
       <div className="space-y-2">
-        <Label>Role(s)</Label>
+        <Label>Access level</Label>
+        <p className="text-xs text-muted-foreground">
+          Controls what you can edit in the system.
+        </p>
         <div className="flex flex-col gap-2">
           {ROLE_OPTIONS.map((opt) => {
             const checked = roles.includes(opt.value);

@@ -70,6 +70,7 @@ const clientListSelect = {
   name: true,
   phone: true,
   email: true,
+  status: true,
   updatedAt: true,
   vehicles: {
     select: { id: true, make: true, model: true, year: true },
@@ -82,6 +83,7 @@ const clientListSelect = {
       status: true,
       expectedDate: true,
       updatedAt: true,
+      assignedTechName: true,
       assignedTech: { select: { id: true, name: true } },
       vehicle: { select: { make: true, model: true, year: true } },
       parts: { select: { availability: true } },
@@ -292,11 +294,3 @@ export async function getFeedbackAggregate(clientId: string): Promise<FeedbackAg
   };
 }
 
-/** Technicians for the assigned-tech picker on the order form. */
-export async function getTechnicians(): Promise<{ id: string; name: string }[]> {
-  return prisma.user.findMany({
-    where: { roles: { has: "TECHNICIAN" }, banned: { not: true } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-}

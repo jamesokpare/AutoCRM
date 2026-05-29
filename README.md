@@ -21,18 +21,42 @@ First, install the dependencies:
 pnpm install
 ```
 
+## Environment Variables
+
+Copy `apps/web/.env.example` to `apps/web/.env` and fill in real values:
+
+```bash
+cp apps/web/.env.example apps/web/.env
+```
+
+All of the following are **required** — they are validated at startup
+(`packages/env/src/server.ts`), and a missing or invalid value will cause the
+server to fail to boot, which shows up in the UI as `Sign up failed (status 500)`:
+
+| Variable | Notes |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL / Neon connection string |
+| `BETTER_AUTH_SECRET` | Must be at least 32 characters (`openssl rand -base64 32`) |
+| `BETTER_AUTH_URL` | Base URL of the web app |
+| `CORS_ORIGIN` | Allowed auth origin (usually same as `BETTER_AUTH_URL`) |
+
 ## Database Setup
 
 This project uses PostgreSQL with Prisma.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/web/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
+1. Make sure you have a PostgreSQL database set up and `DATABASE_URL` configured (see above).
+2. Apply the schema to **the same database the app connects to**:
 
 ```bash
 pnpm run db:push
 ```
+
+> [!IMPORTANT]
+> If sign up / login fail with `Sign up failed (status 500)`, the most common
+> cause is that the schema has not been applied to the database the app is
+> pointing at. The server log will show a Prisma `P2021` error
+> (`The table "public.user" does not exist`). Run `pnpm run db:push` against
+> the correct `DATABASE_URL` to fix it.
 
 Then, run the development server:
 

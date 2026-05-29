@@ -17,6 +17,10 @@ model User {
 
   // CRM profile fields (SPEC §3 — extends Better-Auth user)
   roles            Role[]  @default([])
+  // Free-text role / job title written by the employee in their own words.
+  // The canonical `roles` enum still drives RBAC; this is the human-readable
+  // version shown to teammates.
+  jobTitle         String?
   kpis             String?
   bottlenecks      String?
   photo            String?

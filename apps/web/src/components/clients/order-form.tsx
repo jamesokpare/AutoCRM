@@ -24,31 +24,24 @@ export interface VehicleOption {
   label: string;
 }
 
-export interface TechOption {
-  id: string;
-  name: string;
-}
-
 export interface OrderInitial {
   id: string;
   description: string;
   vehicleId: string;
   receivedDate: string; // yyyy-mm-dd
   expectedDate?: string | null; // yyyy-mm-dd
-  assignedTechId?: string | null;
+  assignedTechName?: string | null;
 }
 
 /** CLT-03..06: create or edit a service order (with an optional parts list on create). */
 export function OrderForm({
   clientId,
   vehicles,
-  techs,
   initial,
   trigger,
 }: {
   clientId: string;
   vehicles: VehicleOption[];
-  techs: TechOption[];
   initial?: OrderInitial;
   trigger: React.ReactElement;
 }) {
@@ -125,20 +118,13 @@ export function OrderForm({
           </div>
 
           <div className="flex flex-col gap-1">
-            <Label htmlFor="assignedTechId">Assigned technician</Label>
-            <select
-              id="assignedTechId"
-              name="assignedTechId"
-              defaultValue={initial?.assignedTechId ?? ""}
-              className="h-8 rounded-none border border-input bg-transparent px-2.5 text-xs"
-            >
-              <option value="">Unassigned</option>
-              {techs.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <Label htmlFor="assignedTechName">Assigned technician</Label>
+            <Input
+              id="assignedTechName"
+              name="assignedTechName"
+              defaultValue={initial?.assignedTechName ?? ""}
+              placeholder="Technician name"
+            />
           </div>
 
           {!isEdit ? (

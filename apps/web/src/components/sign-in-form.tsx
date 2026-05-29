@@ -31,7 +31,11 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
             toast.success("Sign in successful");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            toast.error(
+              error.error.message ||
+                error.error.statusText ||
+                `Sign in failed (status ${error.error.status ?? "unknown"})`,
+            );
           },
         },
       );

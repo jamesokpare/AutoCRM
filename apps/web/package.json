@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
+    "db:push": "pnpm --filter @crm-tool/db db:push",
     "start": "next start",
     "check-types": "tsc --noEmit"
   },
