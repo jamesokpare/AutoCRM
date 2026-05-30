@@ -23,3 +23,8 @@ export interface ProfileActionResult {
   ok: boolean;
   error?: string;
 }
+
+export interface DeleteAccountInput {
+  /** User must re-type their own email address to confirm deletion. */
+  confirmEmail: string;
+}
