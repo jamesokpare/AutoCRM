@@ -57,6 +57,7 @@ export default async function ReportsPage({
       monthOptions={monthOptions}
       plainText={plainText}
       currentUserEmail={session.user.email}
+      currentUserId={session.user.id}
       canClearActivity={canClearActivity}
     />
   );

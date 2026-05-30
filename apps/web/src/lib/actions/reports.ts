@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
-import { PermissionError, requirePermission } from "@/lib/rbac";
+import { PermissionError, can } from "@/lib/rbac";
 
 export interface ClearEmployeeActivityInput {
   userId: string;
@@ -27,10 +27,11 @@ interface SessionUser {
 }
 
 /**
- * Admin-only: delete every `ActivityLog` row authored by `userId` whose
- * `createdAt` falls in the given month. Used by the reports page to clear an
- * employee's monthly activity. A single audit row is written naming the cleared
- * user + month so the destructive action itself remains traceable.
+ * Delete every `ActivityLog` row authored by `userId` whose `createdAt` falls
+ * in the given month. Used by the reports page to clear an employee's monthly
+ * activity. Allowed when the caller is an admin (`manage_users`) OR when the
+ * caller is clearing their own row. A single audit row is written naming the
+ * cleared user + month so the destructive action itself remains traceable.
  */
 export async function clearEmployeeMonthlyActivity(
   input: ClearEmployeeActivityInput,
@@ -38,10 +39,19 @@ export async function clearEmployeeMonthlyActivity(
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     const user = session?.user as SessionUser | undefined;
-    requirePermission(user ? { user: { roles: user.roles } } : null, "manage_users");
+    if (!user) throw new PermissionError("UNAUTHENTICATED", "You must be signed in.");
 
     const { userId, year, month } = input;
     if (!userId) return { ok: false, error: "Missing employee." };
+
+    const isSelf = user.id === userId;
+    const roles = (user.roles ?? []) as Role[];
+    if (!isSelf && !can(roles, "manage_users")) {
+      throw new PermissionError(
+        "FORBIDDEN",
+        "You can only clear your own activity.",
+      );
+    }
     if (!Number.isInteger(year) || year < 1970 || year > 9999) {
       return { ok: false, error: "Invalid year." };
     }

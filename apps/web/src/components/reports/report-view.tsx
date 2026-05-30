@@ -70,12 +70,14 @@ export function ReportView({
   monthOptions,
   plainText,
   currentUserEmail,
+  currentUserId,
   canClearActivity = false,
 }: {
   report: SerialisedReport;
   monthOptions: { value: string; label: string }[];
   plainText: string;
   currentUserEmail: string;
+  currentUserId: string;
   canClearActivity?: boolean;
 }) {
   const router = useRouter();
@@ -114,6 +116,11 @@ export function ReportView({
     () => report.employees.filter((e) => e.total > 0),
     [report.employees],
   );
+  // The actions column appears for admins (clear any row) or when the viewer's
+  // own row is present (clear self only). Hidden otherwise to keep the table
+  // tight for non-admin viewers with no activity this month.
+  const showEmployeeActions =
+    canClearActivity || employeesWithActivity.some((e) => e.user.id === currentUserId);
   const clientsWithActivity = useMemo(
     () => report.clients.filter((c) => c.total > 0),
     [report.clients],
@@ -213,7 +220,7 @@ export function ReportView({
                     </TableHead>
                   ))}
                   <TableHead className="text-right">Total</TableHead>
-                  {canClearActivity && (
+                  {showEmployeeActions && (
                     <TableHead className="w-10 text-right">
                       <span className="sr-only">Actions</span>
                     </TableHead>
@@ -224,45 +231,57 @@ export function ReportView({
                 {employeesWithActivity.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={report.weeks.length + 2 + (canClearActivity ? 1 : 0)}
+                      colSpan={report.weeks.length + 2 + (showEmployeeActions ? 1 : 0)}
                       className="text-center text-muted-foreground"
                     >
                       No activity recorded in {report.monthLabel}.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  employeesWithActivity.map((emp) => (
-                    <TableRow key={emp.user.id}>
-                      <TableCell>
-                        <div className="font-medium">{emp.user.name}</div>
-                        <div className="text-xs text-muted-foreground">{emp.user.email}</div>
-                      </TableCell>
-                      {emp.weeks.map((w) => (
-                        <TableCell key={w.weekIndex} className="text-right tabular-nums">
-                          {w.total === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            w.total
-                          )}
+                  employeesWithActivity.map((emp) => {
+                    const isSelf = emp.user.id === currentUserId;
+                    const canClearRow = canClearActivity || isSelf;
+                    return (
+                      <TableRow key={emp.user.id}>
+                        <TableCell>
+                          <div className="font-medium">
+                            {emp.user.name}
+                            {isSelf && (
+                              <span className="ml-1 text-xs text-muted-foreground">(you)</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{emp.user.email}</div>
                         </TableCell>
-                      ))}
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {emp.total}
-                      </TableCell>
-                      {canClearActivity && (
-                        <TableCell className="text-right">
-                          <ClearEmployeeActivityButton
-                            userId={emp.user.id}
-                            name={emp.user.name}
-                            year={report.year}
-                            month={report.month}
-                            monthLabel={report.monthLabel}
-                            total={emp.total}
-                          />
+                        {emp.weeks.map((w) => (
+                          <TableCell key={w.weekIndex} className="text-right tabular-nums">
+                            {w.total === 0 ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              w.total
+                            )}
+                          </TableCell>
+                        ))}
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {emp.total}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))
+                        {showEmployeeActions && (
+                          <TableCell className="text-right">
+                            {canClearRow && (
+                              <ClearEmployeeActivityButton
+                                userId={emp.user.id}
+                                name={emp.user.name}
+                                year={report.year}
+                                month={report.month}
+                                monthLabel={report.monthLabel}
+                                total={emp.total}
+                                isSelf={isSelf}
+                              />
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -335,6 +354,7 @@ function ClearEmployeeActivityButton({
   month,
   monthLabel,
   total,
+  isSelf = false,
 }: {
   userId: string;
   name: string;
@@ -342,10 +362,13 @@ function ClearEmployeeActivityButton({
   month: number;
   monthLabel: string;
   total: number;
+  isSelf?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const subject = isSelf ? "your" : `${name}'s`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -354,8 +377,8 @@ function ClearEmployeeActivityButton({
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label={`Clear ${name}'s activity for ${monthLabel}`}
-            title={`Clear activity for ${monthLabel}`}
+            aria-label={`Clear ${subject} activity for ${monthLabel}`}
+            title={`Clear ${subject} activity for ${monthLabel}`}
           >
             <Trash2 className="size-4" />
           </Button>
@@ -363,12 +386,12 @@ function ClearEmployeeActivityButton({
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Clear {name}&apos;s activity?</DialogTitle>
+          <DialogTitle>Clear {subject} activity?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           This permanently removes {total} activity {total === 1 ? "entry" : "entries"} authored by{" "}
-          {name} during {monthLabel}. The underlying orders, tasks and client records are
-          untouched. This cannot be undone.
+          {isSelf ? "you" : name} during {monthLabel}. The underlying orders, tasks and client
+          records are untouched. This cannot be undone.
         </p>
         <DialogFooter>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => setOpen(false)}>
@@ -388,7 +411,7 @@ function ClearEmployeeActivityButton({
                 toast.success(
                   `Cleared ${res.deleted ?? 0} ${
                     (res.deleted ?? 0) === 1 ? "entry" : "entries"
-                  } for ${name}`,
+                  } for ${isSelf ? "you" : name}`,
                 );
                 setOpen(false);
                 router.refresh();
