@@ -1,6 +1,6 @@
 import "server-only";
 
-import { OrderStatus, PartAvailability, Prisma } from "@crm-tool/db";
+import { OrderStatus, PartAvailability, Prisma, ServiceStatus } from "@crm-tool/db";
 
 import { prisma } from "@/lib/db";
 
@@ -42,27 +42,70 @@ function watTodayRange(): { start: Date; end: Date } {
   return { start: startUtc, end: endUtc };
 }
 
-/** Builds the Prisma `Order` where-clause shared by list filters. */
-function buildOrderWhere(filters: ClientListFilters): Prisma.OrderWhereInput {
-  const where: Prisma.OrderWhereInput = {};
-  if (filters.status) where.status = filters.status;
-  if (filters.techId) where.assignedTechId = filters.techId;
+/** The five shared statuses map 1:1 between OrderStatus and ServiceStatus. */
+const ORDER_TO_SERVICE: Record<OrderStatus, ServiceStatus> = {
+  PENDING: ServiceStatus.PENDING,
+  IN_PROGRESS: ServiceStatus.IN_PROGRESS,
+  COMPLETED: ServiceStatus.COMPLETED,
+  FAILED: ServiceStatus.FAILED,
+  ON_HOLD: ServiceStatus.ON_HOLD,
+};
+
+/**
+ * Builds the client-level filter conditions (AND-combined). Each status/quick
+ * filter matches a client if EITHER one of its orders matches OR the client's
+ * manually-set `serviceStatus` matches — so a client with no orders is still
+ * filterable via its service status (CLT). Tech and received-date filters stay
+ * order-only (a service status carries neither).
+ */
+function buildClientConditions(filters: ClientListFilters): Prisma.ClientWhereInput[] {
+  const and: Prisma.ClientWhereInput[] = [];
+
+  if (filters.status) {
+    and.push({
+      OR: [
+        { orders: { some: { status: filters.status } } },
+        { serviceStatus: ORDER_TO_SERVICE[filters.status] },
+      ],
+    });
+  }
+
+  if (filters.techId) {
+    and.push({ orders: { some: { assignedTechId: filters.techId } } });
+  }
 
   if (filters.quick === "failed") {
-    where.status = OrderStatus.FAILED;
+    and.push({
+      OR: [
+        { orders: { some: { status: OrderStatus.FAILED } } },
+        { serviceStatus: ServiceStatus.FAILED },
+      ],
+    });
   } else if (filters.quick === "due_today") {
     const { start, end } = watTodayRange();
-    where.expectedDate = { gte: start, lt: end };
+    and.push({
+      OR: [
+        { orders: { some: { expectedDate: { gte: start, lt: end } } } },
+        { serviceStatus: ServiceStatus.DUE_TODAY },
+      ],
+    });
   } else if (filters.quick === "parts_not_available") {
-    where.parts = { some: { availability: PartAvailability.NOT_AVAILABLE } };
+    and.push({
+      OR: [
+        { orders: { some: { parts: { some: { availability: PartAvailability.NOT_AVAILABLE } } } } },
+        { serviceStatus: ServiceStatus.PARTS_NOT_AVAILABLE },
+      ],
+    });
   }
 
   if (filters.receivedFrom || filters.receivedTo) {
-    where.receivedDate = {};
-    if (filters.receivedFrom) where.receivedDate.gte = new Date(filters.receivedFrom);
-    if (filters.receivedTo) where.receivedDate.lte = new Date(filters.receivedTo);
+    const receivedDate: Prisma.DateTimeFilter = {};
+    if (filters.receivedFrom) receivedDate.gte = new Date(filters.receivedFrom);
+    if (filters.receivedTo) receivedDate.lte = new Date(filters.receivedTo);
+    and.push({ orders: { some: { receivedDate } } });
   }
-  return where;
+
+  return and;
 }
 
 const clientListSelect = {
@@ -71,6 +114,7 @@ const clientListSelect = {
   phone: true,
   email: true,
   status: true,
+  serviceStatus: true,
   updatedAt: true,
   vehicles: {
     select: { id: true, make: true, model: true, year: true },
@@ -103,35 +147,32 @@ export type ClientListRow = Prisma.ClientGetPayload<{ select: typeof clientListS
  * if the client or any vehicle matches). Clients with no orders still show.
  */
 export async function getClientList(filters: ClientListFilters = {}): Promise<ClientListRow[]> {
-  const orderWhere = buildOrderWhere(filters);
-  const hasOrderFilter = Object.keys(orderWhere).length > 0;
-
-  const where: Prisma.ClientWhereInput = {};
+  const and = buildClientConditions(filters);
 
   if (filters.search) {
     const q = filters.search.trim();
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { phone: { contains: q, mode: "insensitive" } },
-      { email: { contains: q, mode: "insensitive" } },
-      { whatsapp: { contains: q, mode: "insensitive" } },
-      {
-        vehicles: {
-          some: {
-            OR: [
-              { make: { contains: q, mode: "insensitive" } },
-              { model: { contains: q, mode: "insensitive" } },
-              { plate: { contains: q, mode: "insensitive" } },
-            ],
+    and.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+        { whatsapp: { contains: q, mode: "insensitive" } },
+        {
+          vehicles: {
+            some: {
+              OR: [
+                { make: { contains: q, mode: "insensitive" } },
+                { model: { contains: q, mode: "insensitive" } },
+                { plate: { contains: q, mode: "insensitive" } },
+              ],
+            },
           },
         },
-      },
-    ];
+      ],
+    });
   }
 
-  if (hasOrderFilter) {
-    where.orders = { some: orderWhere };
-  }
+  const where: Prisma.ClientWhereInput = and.length ? { AND: and } : {};
 
   return prisma.client.findMany({
     where,

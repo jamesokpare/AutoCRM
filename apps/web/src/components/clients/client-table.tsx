@@ -26,7 +26,7 @@ import { listClientsAction } from "@/lib/actions/clients";
 import type { ClientListFilters, ClientListRow } from "@/lib/queries/clients";
 
 import { ClientRowDeleteButton } from "./client-actions";
-import { ClientStatusBadge, OrderPartsBadge, StatusBadge } from "./status-badge";
+import { ClientStatusBadge, OrderPartsBadge, ServiceStatusBadge, StatusBadge } from "./status-badge";
 
 type QuickFilter = NonNullable<ClientListFilters["quick"]>;
 
@@ -191,7 +191,18 @@ export function ClientTable({
                     <TableCell className="max-w-[16rem] truncate">
                       {order ? order.description : <span className="text-muted-foreground">No orders</span>}
                     </TableCell>
-                    <TableCell>{order ? <StatusBadge status={order.status} /> : "—"}</TableCell>
+                    <TableCell>
+                      {client.serviceStatus || order ? (
+                        <div className="flex flex-col gap-1">
+                          {client.serviceStatus ? (
+                            <ServiceStatusBadge status={client.serviceStatus} />
+                          ) : null}
+                          {order ? <StatusBadge status={order.status} /> : null}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     <TableCell>
                       {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
                     </TableCell>

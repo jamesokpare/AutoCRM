@@ -6,7 +6,11 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { ApologyDialog } from "@/components/clients/apology-dialog";
-import { ClientDeleteButton, ClientStatusControl } from "@/components/clients/client-actions";
+import {
+  ClientDeleteButton,
+  ClientServiceStatusControl,
+  ClientStatusControl,
+} from "@/components/clients/client-actions";
 import { ClientForm } from "@/components/clients/client-form";
 import { ClientUpdateForm } from "@/components/clients/client-update-form";
 import { FeedbackForm } from "@/components/clients/feedback-form";
@@ -94,6 +98,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="flex flex-wrap items-center gap-2">
           {canEdit ? (
             <ClientStatusControl clientId={client.id} current={client.status} />
+          ) : null}
+          {canEdit ? (
+            <ClientServiceStatusControl clientId={client.id} current={client.serviceStatus} />
           ) : null}
           <FeedbackForm
             clientId={client.id}

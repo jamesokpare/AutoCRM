@@ -1,4 +1,4 @@
-import { ClientStatus, OrderStatus, PartAvailability } from "@crm-tool/db/enums";
+import { ClientStatus, OrderStatus, PartAvailability, ServiceStatus } from "@crm-tool/db/enums";
 import { Badge } from "@crm-tool/ui/components/badge";
 import { cn } from "@crm-tool/ui/lib/utils";
 import { CalendarClock } from "lucide-react";
@@ -115,6 +115,47 @@ export function ClientStatusBadge({
       )}
     >
       {CLIENT_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
+  PENDING: "Pending",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+  ON_HOLD: "On Hold",
+  DUE_TODAY: "Due today",
+  PARTS_NOT_AVAILABLE: "Parts not available",
+};
+
+const SERVICE_STATUS_CLASS: Record<ServiceStatus, string> = {
+  PENDING: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  IN_PROGRESS: "border-transparent bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  COMPLETED: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  FAILED: "border-transparent bg-red-500/15 text-red-700 dark:text-red-400",
+  ON_HOLD: "border-transparent bg-muted text-muted-foreground",
+  DUE_TODAY: "border-transparent bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  PARTS_NOT_AVAILABLE: "border-transparent bg-red-500/15 text-red-700 dark:text-red-400",
+};
+
+/** Manually-set client service status badge (CLT). */
+export function ServiceStatusBadge({
+  status,
+  className,
+}: {
+  status: ServiceStatus;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit shrink-0 items-center rounded-none px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        SERVICE_STATUS_CLASS[status],
+        className,
+      )}
+    >
+      {SERVICE_STATUS_LABEL[status]}
     </span>
   );
 }

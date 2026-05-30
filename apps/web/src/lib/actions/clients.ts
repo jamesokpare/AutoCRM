@@ -7,6 +7,7 @@ import {
   OrderStatus,
   PartAvailability,
   type Role,
+  ServiceStatus,
 } from "@crm-tool/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -387,6 +388,53 @@ export async function setClientStatus(
         metadata: { from: current.status, to: parsed },
       },
       async () => prisma.client.update({ where: { id: clientId }, data: { status: parsed } }),
+    );
+
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { id: clientId } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+function parseServiceStatus(value: string | null | undefined): ServiceStatus | null {
+  if (!value) return null;
+  return (Object.values(ServiceStatus) as string[]).includes(value)
+    ? (value as ServiceStatus)
+    : null;
+}
+
+/**
+ * Set (or clear, with null) a client's manual service status — the seven-value
+ * status surfaced in the dashboard filters (CLT). Lets a client be filtered by
+ * status even before it has any order. Open to every signed-in team member.
+ */
+export async function setClientServiceStatus(
+  clientId: string,
+  status: ServiceStatus | null,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await requireEdit();
+    const parsed = status === null ? null : parseServiceStatus(status);
+    if (status !== null && !parsed) return { ok: false, error: "Invalid service status." };
+
+    const current = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, serviceStatus: true },
+    });
+    if (!current) return { ok: false, error: "Client not found." };
+
+    await withMutation(
+      {
+        entityType: "Client",
+        action: "service_status_changed",
+        userId: user.id,
+        entityId: clientId,
+        metadata: { from: current.serviceStatus, to: parsed },
+      },
+      async () => prisma.client.update({ where: { id: clientId }, data: { serviceStatus: parsed } }),
     );
 
     revalidatePath(`/clients/${clientId}`);

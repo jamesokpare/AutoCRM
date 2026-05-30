@@ -1,6 +1,6 @@
 "use client";
 
-import { ClientStatus } from "@crm-tool/db/enums";
+import { ClientStatus, ServiceStatus } from "@crm-tool/db/enums";
 import { Button } from "@crm-tool/ui/components/button";
 import {
   Dialog,
@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { deleteClient, setClientStatus } from "@/lib/actions/clients";
+import { deleteClient, setClientServiceStatus, setClientStatus } from "@/lib/actions/clients";
 
 const STATUS_OPTIONS: { value: ClientStatus; label: string }[] = [
   { value: ClientStatus.PROSPECT, label: "Prospect" },
@@ -64,6 +64,69 @@ export function ClientStatusControl({
       </SelectTrigger>
       <SelectContent>
         {STATUS_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// "None" clears the manual service status; Select can't hold an empty value, so
+// we model "unset" as an explicit sentinel option.
+const SERVICE_STATUS_NONE = "NONE";
+const SERVICE_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: SERVICE_STATUS_NONE, label: "No service status" },
+  { value: ServiceStatus.PENDING, label: "Pending" },
+  { value: ServiceStatus.IN_PROGRESS, label: "In Progress" },
+  { value: ServiceStatus.COMPLETED, label: "Completed" },
+  { value: ServiceStatus.FAILED, label: "Failed" },
+  { value: ServiceStatus.ON_HOLD, label: "On Hold" },
+  { value: ServiceStatus.DUE_TODAY, label: "Due today" },
+  { value: ServiceStatus.PARTS_NOT_AVAILABLE, label: "Parts not available" },
+];
+
+/**
+ * CLT: manual, client-level service status. Offers the five real statuses plus
+ * the two derived dashboard buckets (Due today, Parts not available) and a
+ * "None" option to clear it. Unlike the order status, it lives on the client,
+ * so it filters even for clients with no orders. Reflected in the dashboard
+ * filters (status dropdown + quick filters).
+ */
+export function ClientServiceStatusControl({
+  clientId,
+  current,
+}: {
+  clientId: string;
+  current: ServiceStatus | null;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Select
+      items={SERVICE_STATUS_OPTIONS}
+      value={current ?? SERVICE_STATUS_NONE}
+      onValueChange={(value) => {
+        const next = value === SERVICE_STATUS_NONE ? null : (value as ServiceStatus);
+        if (next === (current ?? null)) return;
+        startTransition(async () => {
+          const res = await setClientServiceStatus(clientId, next);
+          if (!res.ok) {
+            toast.error(res.error ?? "Failed to update status.");
+            return;
+          }
+          toast.success("Service status updated");
+          router.refresh();
+        });
+      }}
+    >
+      <SelectTrigger className="h-8 w-48" disabled={pending} aria-label="Service status">
+        <SelectValue placeholder="Service status" />
+      </SelectTrigger>
+      <SelectContent>
+        {SERVICE_STATUS_OPTIONS.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
             {opt.label}
           </SelectItem>
