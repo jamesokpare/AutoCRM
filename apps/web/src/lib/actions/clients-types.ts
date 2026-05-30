@@ -13,3 +13,21 @@ export interface ActionResult<T = undefined> {
   error?: string;
   data?: T;
 }
+
+/** A single client row parsed from a CSV/paste import (CLT bulk import). */
+export interface ClientImportRow {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  whatsapp?: string | null;
+  address?: string | null;
+  preferredChannel?: string | null;
+}
+
+/** Outcome of a bulk client import. */
+export interface ClientImportResult {
+  created: number;
+  skipped: number;
+  /** Human-readable, row-scoped messages (capped) for skipped/failed rows. */
+  errors: string[];
+}
