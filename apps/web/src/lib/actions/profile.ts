@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { withMutation } from "@/lib/mutation";
-import type { ProfileActionResult, UpdateProfileInput } from "./profile-types";
+import type { DeleteAccountInput, ProfileActionResult, UpdateProfileInput } from "./profile-types";
 
 const ALL_ROLES = Object.values(Role) as Role[];
 
@@ -62,5 +62,35 @@ export async function updateProfile(input: UpdateProfileInput): Promise<ProfileA
 
   revalidatePath("/profile");
   revalidatePath("/team");
+  return { ok: true };
+}
+
+/**
+ * Permanently delete the signed-in user's own account.
+ *
+ * The user must re-type their email to confirm. Related rows are removed by
+ * the `onDelete: Cascade` relations on the User model (sessions, accounts,
+ * attendance, reviews, tasks the user authored/assigned, etc.). After the
+ * row is gone the existing session cookie is already invalid; the client
+ * still calls `authClient.signOut` to clear it locally and route home.
+ */
+export async function deleteOwnAccount(input: DeleteAccountInput): Promise<ProfileActionResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return { ok: false, error: "You must be signed in." };
+  }
+
+  const typed = input.confirmEmail?.trim().toLowerCase();
+  const actual = session.user.email?.trim().toLowerCase();
+  if (!typed || typed !== actual) {
+    return { ok: false, error: "Email did not match — account was not deleted." };
+  }
+
+  // No `withMutation` wrapper here: ActivityLog rows cascade-delete with the
+  // user (FK onDelete: Cascade), so any self-audit row would vanish in the
+  // same transaction. The admin-initiated delete in /admin/users does log,
+  // because the actor is a different (surviving) user.
+  await prisma.user.delete({ where: { id: session.user.id } });
+
   return { ok: true };
 }

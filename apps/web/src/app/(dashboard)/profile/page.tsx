@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { DeleteAccountCard } from "@/components/team/delete-account-card";
 import { ProfileForm } from "@/components/team/profile-form";
 import { ReviewAggregateCard } from "@/components/team/review-aggregate";
 import { prisma } from "@/lib/db";
@@ -26,6 +27,7 @@ export default async function ProfilePage() {
     select: {
       id: true,
       name: true,
+      email: true,
       roles: true,
       jobTitle: true,
       photo: true,
@@ -72,6 +74,8 @@ export default async function ProfilePage() {
           <ReviewAggregateCard aggregate={aggregate} title="My performance" />
         ) : null}
       </div>
+
+      <DeleteAccountCard email={me.email} />
     </div>
   );
 }
