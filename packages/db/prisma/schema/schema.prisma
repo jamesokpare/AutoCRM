@@ -35,6 +35,20 @@ enum ClientStatus {
   ARCHIVED
 }
 
+// A manually-set, client-level service status surfaced in the dashboard
+// filters. Mirrors the five OrderStatus values plus the two derived dashboard
+// buckets (DUE_TODAY, PARTS_NOT_AVAILABLE) so a client can be filtered even
+// before it has any order (e.g. a freshly imported client). CLT.
+enum ServiceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ON_HOLD
+  DUE_TODAY
+  PARTS_NOT_AVAILABLE
+}
+
 enum PartAvailability {
   AVAILABLE
   NOT_AVAILABLE
@@ -106,9 +120,12 @@ model Client {
   whatsapp         String?
   address          String?
   preferredChannel Channel?
-  status           ClientStatus @default(ACTIVE)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  status           ClientStatus   @default(ACTIVE)
+  // Manually-set service status (CLT). Null = unset; the dashboard filters fall
+  // back to the client's order statuses when this is null.
+  serviceStatus    ServiceStatus?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   vehicles       Vehicle[]
   orders         Order[]
@@ -118,6 +135,7 @@ model Client {
   updates        ClientUpdate[]
 
   @@index([name])
+  @@index([serviceStatus])
 }
 
 // Free-form daily progress note logged against a client. Open to all
