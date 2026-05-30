@@ -34,7 +34,20 @@ const PART_LABEL: Record<PartAvailability, string> = {
   NOT_AVAILABLE: "Not available",
 };
 
-const REASON_STATUSES: OrderStatus[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];
+const REASON_STATUSES: string[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];
+
+// Derived dashboard buckets offered alongside the real statuses. Selecting one
+// resolves to PENDING plus a side effect handled in createClientFull: "Due
+// today" sets the expected date to today; "Parts not available" adds an
+// unavailable part. Kept in sync with the sentinels in clients.ts.
+const DUE_TODAY_STATUS = "__due_today__";
+const PARTS_NA_STATUS = "__parts_not_available__";
+
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  ...Object.values(OrderStatus).map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+  { value: DUE_TODAY_STATUS, label: "Due today" },
+  { value: PARTS_NA_STATUS, label: "Parts not available" },
+];
 
 interface PartRow {
   name: string;
@@ -55,7 +68,7 @@ export function ClientIntakeForm({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState<OrderStatus>(OrderStatus.PENDING);
+  const [status, setStatus] = useState<string>(OrderStatus.PENDING);
   const [parts, setParts] = useState<PartRow[]>([]);
   const router = useRouter();
 
@@ -143,12 +156,12 @@ export function ClientIntakeForm({
                   id="status"
                   name="status"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as OrderStatus)}
+                  onChange={(e) => setStatus(e.target.value)}
                   className={selectClass}
                 >
-                  {Object.values(OrderStatus).map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABEL[s]}
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -163,17 +176,29 @@ export function ClientIntakeForm({
               </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="expectedDate">Expected completion</Label>
-                <Input id="expectedDate" name="expectedDate" type="date" />
+                {status === DUE_TODAY_STATUS ? (
+                  <p className="flex h-8 items-center text-xs text-muted-foreground">
+                    Set to today automatically.
+                  </p>
+                ) : (
+                  <Input id="expectedDate" name="expectedDate" type="date" />
+                )}
               </div>
             </div>
 
             {REASON_STATUSES.includes(status) ? (
               <div className="flex flex-col gap-1">
                 <Label htmlFor="statusReason">
-                  Reason (required for {STATUS_LABEL[status]})
+                  Reason (required for {STATUS_LABEL[status as OrderStatus]})
                 </Label>
                 <Textarea id="statusReason" name="statusReason" rows={2} />
               </div>
+            ) : null}
+
+            {status === PARTS_NA_STATUS ? (
+              <p className="text-xs text-muted-foreground">
+                An unavailable part will be added if you don&apos;t mark one below.
+              </p>
             ) : null}
 
             {/* Parts with availability */}

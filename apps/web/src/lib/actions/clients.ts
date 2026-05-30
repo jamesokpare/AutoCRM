@@ -95,6 +95,14 @@ function parseAvailability(value: string): PartAvailability {
 
 const REQUIRES_REASON: OrderStatus[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];
 
+// "Due today" and "Parts not available" are derived dashboard buckets, not
+// stored statuses. The intake form offers them in the status dropdown; here we
+// map them onto the underlying order fields (expected date / a NOT_AVAILABLE
+// part) so the new order lands in that dashboard filter. Kept in sync with the
+// sentinels in components/clients/order-actions.tsx.
+const DUE_TODAY_STATUS = "__due_today__";
+const PARTS_NA_STATUS = "__parts_not_available__";
+
 /**
  * Reads the parts list from the intake form. Parts arrive as index-aligned
  * repeated `partName` / `partAvailability` fields; an empty name is skipped.
@@ -171,7 +179,15 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
       return { ok: false, error: "Add a vehicle before creating an order." };
     }
 
-    const status = parseStatus(form.get("status")) ?? OrderStatus.PENDING;
+    // The status field may carry a real OrderStatus or one of the two derived
+    // sentinels, which resolve to PENDING plus a side effect (see below).
+    const rawStatus = str(form.get("status"));
+    const dueToday = rawStatus === DUE_TODAY_STATUS;
+    const partsNotAvailable = rawStatus === PARTS_NA_STATUS;
+    const status =
+      dueToday || partsNotAvailable
+        ? OrderStatus.PENDING
+        : (parseStatus(form.get("status")) ?? OrderStatus.PENDING);
     const statusReason = str(form.get("statusReason"));
     if (wantsOrder && REQUIRES_REASON.includes(status) && !statusReason) {
       return { ok: false, error: "A reason is required when status is Failed or On Hold." };
@@ -219,6 +235,11 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
 
       if (wantsOrder) {
         const parts = parsePartsPairs(form);
+        // "Parts not available" guarantees at least one unavailable part so the
+        // order matches the dashboard's parts filter.
+        if (partsNotAvailable && !parts.some((p) => p.availability === PartAvailability.NOT_AVAILABLE)) {
+          parts.push({ name: "Awaiting part", availability: PartAvailability.NOT_AVAILABLE });
+        }
         await withMutation(
           {
             entityType: "Order",
@@ -235,7 +256,7 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
                 status,
                 statusReason: REQUIRES_REASON.includes(status) ? statusReason : null,
                 receivedDate: parseDate(form.get("receivedDate")) ?? new Date(),
-                expectedDate: parseDate(form.get("expectedDate")),
+                expectedDate: dueToday ? new Date() : parseDate(form.get("expectedDate")),
                 assignedTechName: str(form.get("assignedTechName")),
                 parts: parts.length ? { create: parts } : undefined,
               },
