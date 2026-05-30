@@ -28,10 +28,12 @@ import {
   TableRow,
 } from "@crm-tool/ui/components/table";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@crm-tool/ui/components/tabs";
-import { Download, Mail } from "lucide-react";
+import { Download, Mail, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+
+import { clearEmployeeMonthlyActivity } from "@/lib/actions/reports";
 
 /**
  * Client-shape report — Date fields serialised to ISO strings so the payload
@@ -68,11 +70,13 @@ export function ReportView({
   monthOptions,
   plainText,
   currentUserEmail,
+  canClearActivity = false,
 }: {
   report: SerialisedReport;
   monthOptions: { value: string; label: string }[];
   plainText: string;
   currentUserEmail: string;
+  canClearActivity?: boolean;
 }) {
   const router = useRouter();
   const currentValue = `${report.year}-${report.month}`;
@@ -209,13 +213,18 @@ export function ReportView({
                     </TableHead>
                   ))}
                   <TableHead className="text-right">Total</TableHead>
+                  {canClearActivity && (
+                    <TableHead className="w-10 text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {employeesWithActivity.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={report.weeks.length + 2}
+                      colSpan={report.weeks.length + 2 + (canClearActivity ? 1 : 0)}
                       className="text-center text-muted-foreground"
                     >
                       No activity recorded in {report.monthLabel}.
@@ -240,6 +249,18 @@ export function ReportView({
                       <TableCell className="text-right font-medium tabular-nums">
                         {emp.total}
                       </TableCell>
+                      {canClearActivity && (
+                        <TableCell className="text-right">
+                          <ClearEmployeeActivityButton
+                            userId={emp.user.id}
+                            name={emp.user.name}
+                            year={report.year}
+                            month={report.month}
+                            monthLabel={report.monthLabel}
+                            total={emp.total}
+                          />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -304,5 +325,80 @@ export function ReportView({
         </TabsPanel>
       </Tabs>
     </div>
+  );
+}
+
+function ClearEmployeeActivityButton({
+  userId,
+  name,
+  year,
+  month,
+  monthLabel,
+  total,
+}: {
+  userId: string;
+  name: string;
+  year: number;
+  month: number;
+  monthLabel: string;
+  total: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={`Clear ${name}'s activity for ${monthLabel}`}
+            title={`Clear activity for ${monthLabel}`}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Clear {name}&apos;s activity?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          This permanently removes {total} activity {total === 1 ? "entry" : "entries"} authored by{" "}
+          {name} during {monthLabel}. The underlying orders, tasks and client records are
+          untouched. This cannot be undone.
+        </p>
+        <DialogFooter>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const res = await clearEmployeeMonthlyActivity({ userId, year, month });
+                if (!res.ok) {
+                  toast.error(res.error ?? "Failed to clear activity.");
+                  return;
+                }
+                toast.success(
+                  `Cleared ${res.deleted ?? 0} ${
+                    (res.deleted ?? 0) === 1 ? "entry" : "entries"
+                  } for ${name}`,
+                );
+                setOpen(false);
+                router.refresh();
+              })
+            }
+          >
+            {pending ? "Clearing…" : "Clear activity"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
