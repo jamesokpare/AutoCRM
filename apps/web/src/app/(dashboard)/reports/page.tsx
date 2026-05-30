@@ -1,9 +1,11 @@
 import { auth } from "@crm-tool/auth";
+import type { Role } from "@crm-tool/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ReportView } from "@/components/reports/report-view";
 import { getMonthlyReport, reportToPlainText } from "@/lib/queries/reports";
+import { can } from "@/lib/rbac";
 
 interface SearchParams {
   year?: string;
@@ -36,6 +38,9 @@ export default async function ReportsPage({
   // Build a 12-month picker for the current and previous calendar year.
   const monthOptions = buildMonthOptions(now);
 
+  const roles = ((session.user as { roles?: Role[] }).roles ?? []) as Role[];
+  const canClearActivity = can(roles, "manage_users");
+
   return (
     <ReportView
       report={{
@@ -52,6 +57,8 @@ export default async function ReportsPage({
       monthOptions={monthOptions}
       plainText={plainText}
       currentUserEmail={session.user.email}
+      currentUserId={session.user.id}
+      canClearActivity={canClearActivity}
     />
   );
 }
