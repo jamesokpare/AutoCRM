@@ -14,6 +14,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@crm-tool/ui/components/select";
@@ -24,7 +25,13 @@ import { toast } from "sonner";
 
 import { Input } from "@crm-tool/ui/components/input";
 
-import { addPart, setOrderStatus, setPartAvailability } from "@/lib/actions/orders";
+import {
+  addPart,
+  markOrderDueToday,
+  markOrderPartsNotAvailable,
+  setOrderStatus,
+  setPartAvailability,
+} from "@/lib/actions/orders";
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: "Pending",
@@ -41,24 +48,41 @@ const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = Object.values(Or
   (value) => ({ value, label: STATUS_LABEL[value] }),
 );
 
+// "Due today" and "Parts not available" aren't stored order statuses — they're
+// derived buckets on the dashboard filter. Selecting them performs the
+// underlying change (sets the expected date to today / marks parts
+// unavailable) so the order shows up under that dashboard filter. They never
+// become the dropdown's selected value, which always reflects the real status.
+const DUE_TODAY_VALUE = "__due_today__";
+const PARTS_NA_VALUE = "__parts_not_available__";
+
 /**
  * CLT-07 status control. Requires `update_job_status` (caller decides whether
- * to render it). Rendered as a dropdown toggle. A reason is collected and
- * required when moving to FAILED or ON_HOLD — the action also enforces this
- * server-side.
+ * to render it). Rendered as a dropdown toggle over the five real order
+ * statuses plus two derived actions ("Due today", and — when the caller can
+ * update parts — "Parts not available"). A reason is collected and required
+ * when moving to FAILED or ON_HOLD — the action also enforces this server-side.
  */
 export function StatusControl({
   orderId,
   current,
+  canParts = false,
 }: {
   orderId: string;
   current: OrderStatus;
+  canParts?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [reasonOpen, setReasonOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
   const [reason, setReason] = useState("");
   const router = useRouter();
+
+  const derivedOptions = [
+    { value: DUE_TODAY_VALUE, label: "Due today" },
+    ...(canParts ? [{ value: PARTS_NA_VALUE, label: "Parts not available" }] : []),
+  ];
+  const allOptions = [...STATUS_OPTIONS, ...derivedOptions];
 
   function apply(status: OrderStatus, reasonText?: string) {
     startTransition(async () => {
@@ -74,7 +98,28 @@ export function StatusControl({
     });
   }
 
-  function onPick(status: OrderStatus) {
+  function runDerived(fn: () => Promise<{ ok: boolean; error?: string }>, successMsg: string) {
+    startTransition(async () => {
+      const res = await fn();
+      if (!res.ok) {
+        toast.error(res.error ?? "Failed to update.");
+        return;
+      }
+      toast.success(successMsg);
+      router.refresh();
+    });
+  }
+
+  function onPick(value: string) {
+    if (value === DUE_TODAY_VALUE) {
+      runDerived(() => markOrderDueToday(orderId), "Marked due today");
+      return;
+    }
+    if (value === PARTS_NA_VALUE) {
+      runDerived(() => markOrderPartsNotAvailable(orderId), "Marked parts not available");
+      return;
+    }
+    const status = value as OrderStatus;
     if (status === current) return;
     if (REQUIRES_REASON.includes(status)) {
       setPendingStatus(status);
@@ -87,15 +132,21 @@ export function StatusControl({
   return (
     <>
       <Select
-        items={STATUS_OPTIONS}
+        items={allOptions}
         value={current}
-        onValueChange={(value) => onPick(value as OrderStatus)}
+        onValueChange={(value) => onPick(value as string)}
       >
-        <SelectTrigger className="h-8 w-40" disabled={pending} aria-label="Job status">
+        <SelectTrigger className="h-8 w-44" disabled={pending} aria-label="Job status">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
           {STATUS_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+          <SelectSeparator />
+          {derivedOptions.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
             </SelectItem>

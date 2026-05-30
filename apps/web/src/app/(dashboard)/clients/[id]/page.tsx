@@ -250,7 +250,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                       </p>
                     ) : null}
 
-                    {canStatus ? <StatusControl orderId={order.id} current={order.status} /> : null}
+                    {canStatus ? (
+                      <StatusControl
+                        orderId={order.id}
+                        current={order.status}
+                        canParts={canParts}
+                      />
+                    ) : null}
 
                     {/* Parts */}
                     <div className="space-y-1.5">
