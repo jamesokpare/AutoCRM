@@ -1,5 +1,6 @@
 import { Button } from "@crm-tool/ui/components/button";
 
+import { ClientImportDialog } from "@/components/clients/client-import-dialog";
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { ClientTable } from "@/components/clients/client-table";
 import { getClientList } from "@/lib/queries/clients";
@@ -21,7 +22,16 @@ export default async function ClientsPage() {
             Search and manage clients, vehicles and service orders.
           </p>
         </div>
-        <ClientIntakeForm trigger={<Button size="sm">New client</Button>} />
+        <div className="flex items-center gap-2">
+          <ClientImportDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                Import
+              </Button>
+            }
+          />
+          <ClientIntakeForm trigger={<Button size="sm">New client</Button>} />
+        </div>
       </div>
 
       <ClientTable initialData={clients} />

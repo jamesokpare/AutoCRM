@@ -19,7 +19,11 @@ import {
   getClientList,
 } from "@/lib/queries/clients";
 import { PermissionError, requireAuth } from "@/lib/rbac";
-import type { ActionResult } from "./clients-types";
+import type {
+  ActionResult,
+  ClientImportResult,
+  ClientImportRow,
+} from "./clients-types";
 
 /** Shape of the Better-Auth session user we read. */
 interface SessionUser {
@@ -146,6 +150,90 @@ export async function createClient(form: FormData): Promise<ActionResult<{ id: s
     revalidatePath("/clients");
     revalidatePath("/dashboard");
     return { ok: true, data: { id: client.id } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Trim a free-text import cell to a non-empty string, else null. */
+function cleanCell(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  return v ? v : null;
+}
+
+/** Parse a channel name from an import cell (case-insensitive), else null. */
+function channelFromCell(value: string | null | undefined): Channel | null {
+  const v = value?.trim().toUpperCase();
+  if (!v) return null;
+  return (Object.values(Channel) as string[]).includes(v) ? (v as Channel) : null;
+}
+
+/** Hard cap so a single import can't run away with the request. */
+const MAX_IMPORT_ROWS = 1000;
+
+/**
+ * CLT bulk import: create many clients from rows parsed (client-side) out of a
+ * CSV file or pasted text. Rows missing a name are skipped and reported; the
+ * rest are created one-by-one so a single bad row can't abort the batch. Open
+ * to every signed-in team member, like the other client writes. Each created
+ * client is logged via `withMutation` (source: "import").
+ */
+export async function importClients(
+  rows: ClientImportRow[],
+): Promise<ActionResult<ClientImportResult>> {
+  try {
+    const user = await requireEdit();
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { ok: false, error: "No rows to import." };
+    }
+    if (rows.length > MAX_IMPORT_ROWS) {
+      return { ok: false, error: `Too many rows — max ${MAX_IMPORT_ROWS} per import.` };
+    }
+
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const name = cleanCell(row?.name);
+      if (!name) {
+        skipped++;
+        if (errors.length < 50) errors.push(`Row ${i + 1}: missing name — skipped.`);
+        continue;
+      }
+      try {
+        await withMutation(
+          {
+            entityType: "Client",
+            action: "created",
+            userId: user.id,
+            metadata: { name, source: "import" },
+          },
+          async () =>
+            prisma.client.create({
+              data: {
+                name,
+                phone: cleanCell(row.phone),
+                email: cleanCell(row.email),
+                whatsapp: cleanCell(row.whatsapp),
+                address: cleanCell(row.address),
+                preferredChannel: channelFromCell(row.preferredChannel),
+              },
+            }),
+          (c) => c.id,
+        );
+        created++;
+      } catch {
+        skipped++;
+        if (errors.length < 50) errors.push(`Row ${i + 1} (${name}): failed to create.`);
+      }
+    }
+
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { created, skipped, errors } };
   } catch (err) {
     return fail(err);
   }
