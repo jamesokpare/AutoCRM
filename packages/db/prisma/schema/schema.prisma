@@ -322,6 +322,9 @@ model PerformanceReview {
 model CompanyKPI {
   id           String   @id @default(cuid())
   name         String
+  // Free-form category label so KPIs can be grouped by area (e.g. "Customer
+  // Service", "Engineering", "Operations"). Optional — null = uncategorised.
+  category     String?
   targetValue  Float
   currentValue Float?
   unit         String?
@@ -332,6 +335,7 @@ model CompanyKPI {
   updatedAt    DateTime @updatedAt
 
   @@index([periodStart, periodEnd])
+  @@index([category])
 }
 
 model Reminder {

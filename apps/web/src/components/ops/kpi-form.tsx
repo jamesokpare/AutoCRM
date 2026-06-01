@@ -16,7 +16,17 @@ import { toast } from "sonner";
 
 import { createKpi, updateKpi } from "@/lib/actions/kpi";
 import type { KpiInput } from "@/lib/actions/kpi-types";
-import { detectAutoSource, type KpiView } from "@/lib/queries/kpi-shared";
+import {
+  KPI_CATEGORY_SUGGESTIONS,
+  detectAutoSource,
+  type KpiView,
+} from "@/lib/queries/kpi-shared";
+
+/** Sentinel value for the "type a custom category" option in the select. */
+const CATEGORY_CUSTOM = "__custom__";
+
+const selectClass =
+  "h-8 w-full rounded-none border border-input bg-transparent px-2.5 py-1 text-xs outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 dark:bg-input/30";
 
 /** Local YYYY-MM-DD from an ISO string (date-only input). */
 function toDateInput(iso: string): string {
@@ -37,6 +47,11 @@ export function KpiForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
+  // Two-state category control: a select (preset suggestions / none / custom)
+  // plus a free-form text field shown only when the user picks "custom" or is
+  // editing a KPI whose stored category isn't in the suggestion list.
+  const [categoryChoice, setCategoryChoice] = useState<string>("");
+  const [categoryCustom, setCategoryCustom] = useState("");
   const [targetValue, setTargetValue] = useState("");
   const [currentValue, setCurrentValue] = useState("");
   const [unit, setUnit] = useState("");
@@ -48,6 +63,18 @@ export function KpiForm({
     if (!open) return;
     if (editing) {
       setName(editing.name);
+      const stored = editing.category ?? "";
+      const isPreset = (KPI_CATEGORY_SUGGESTIONS as readonly string[]).includes(stored);
+      if (!stored) {
+        setCategoryChoice("");
+        setCategoryCustom("");
+      } else if (isPreset) {
+        setCategoryChoice(stored);
+        setCategoryCustom("");
+      } else {
+        setCategoryChoice(CATEGORY_CUSTOM);
+        setCategoryCustom(stored);
+      }
       setTargetValue(String(editing.targetValue));
       setCurrentValue(editing.actualValue !== null && !editing.autoComputed ? String(editing.actualValue) : "");
       setUnit(editing.unit ?? "");
@@ -57,6 +84,8 @@ export function KpiForm({
     } else {
       const today = new Date().toISOString().slice(0, 10);
       setName("");
+      setCategoryChoice("");
+      setCategoryCustom("");
       setTargetValue("");
       setCurrentValue("");
       setUnit("");
@@ -66,11 +95,20 @@ export function KpiForm({
     }
   }, [open, editing]);
 
+  function resolvedCategory(): string | null {
+    if (categoryChoice === CATEGORY_CUSTOM) {
+      const trimmed = categoryCustom.trim();
+      return trimmed === "" ? null : trimmed;
+    }
+    return categoryChoice || null;
+  }
+
   const autoEligible = detectAutoSource(name) !== null;
 
   function submit() {
     const input: KpiInput = {
       name,
+      category: resolvedCategory(),
       targetValue: Number(targetValue),
       unit: unit || null,
       // Date-only inputs → treat as midnight UTC for the effective period.
@@ -110,6 +148,32 @@ export function KpiForm({
               <span className="text-xs text-muted-foreground">
                 This name maps to an auto-computed source.
               </span>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="kpi-category">Category (optional)</Label>
+            <select
+              id="kpi-category"
+              className={selectClass}
+              value={categoryChoice}
+              onChange={(e) => setCategoryChoice(e.target.value)}
+            >
+              <option value="">Uncategorised</option>
+              {KPI_CATEGORY_SUGGESTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value={CATEGORY_CUSTOM}>Other (type a category)…</option>
+            </select>
+            {categoryChoice === CATEGORY_CUSTOM ? (
+              <Input
+                aria-label="Custom category"
+                value={categoryCustom}
+                placeholder="e.g. Finance"
+                onChange={(e) => setCategoryCustom(e.target.value)}
+              />
             ) : null}
           </div>
 
