@@ -54,35 +54,76 @@ export async function fetchReminderCentre(scope: "mine" | "team"): Promise<Remin
   return getMyReminderCentre((session.user as SessionUser).id);
 }
 
-/** REM-06: create a one-off or recurring reminder on an order or client. */
+/**
+ * REM-06: create one or more reminders on an order or client.
+ *
+ * Accepts a list of due instants so the caller can schedule MULTIPLE
+ * reminders for the same day in a single submit (e.g. 9am, 12pm, 4pm) — one
+ * `Reminder` row is created per entry. When `frequencyMinutes` is supplied
+ * each row's `recurrence` is stamped with an `every Nm` label so the centre
+ * can render the intra-day cadence the user picked (no scheduler this phase;
+ * the cadence is informational and surfaced in the UI).
+ */
 export async function createReminder(input: CreateReminderInput): Promise<ActionResult> {
   try {
     const user = await requireUser();
 
-    const due = new Date(input.dueAt);
-    if (Number.isNaN(due.getTime())) return { ok: false, error: "Due date is invalid." };
     if (input.orderId && input.clientId) {
       return { ok: false, error: "Attach a reminder to an order OR a client, not both." };
     }
 
-    const created = await withMutation(
-      { entityType: "Reminder", action: "created", userId: user.id },
-      async () =>
-        prisma.reminder.create({
-          data: {
-            type: input.type,
-            orderId: input.orderId || null,
-            clientId: input.clientId || null,
-            dueAt: due,
-            recurrence: input.recurrence?.trim() || null,
-            assigneeId: input.assigneeId || null,
-            state: ReminderState.PENDING,
-          },
-        }),
-      (r) => r.id,
-    );
+    const rawDueAts = Array.isArray(input.dueAts) ? input.dueAts : [];
+    const parsed: Date[] = [];
+    for (const raw of rawDueAts) {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) {
+        return { ok: false, error: "One of the due date/times is invalid." };
+      }
+      parsed.push(d);
+    }
+    if (parsed.length === 0) {
+      return { ok: false, error: "Pick at least one due date/time." };
+    }
+
+    // De-duplicate identical instants (the form's frequency generator can
+    // theoretically emit duplicates if the user also added the same time
+    // manually) and keep them sorted soonest-first for a predictable order.
+    const uniqueMs = Array.from(new Set(parsed.map((d) => d.getTime()))).sort((a, b) => a - b);
+
+    const baseRecurrence = input.recurrence?.trim() || null;
+    const freq =
+      typeof input.frequencyMinutes === "number" && input.frequencyMinutes > 0
+        ? input.frequencyMinutes
+        : null;
+    const recurrenceLabel = freq
+      ? baseRecurrence
+        ? `${baseRecurrence} · every ${freq}m`
+        : `every ${freq}m`
+      : baseRecurrence;
+
+    const createdIds: string[] = [];
+    for (const ms of uniqueMs) {
+      const row = await withMutation(
+        { entityType: "Reminder", action: "created", userId: user.id },
+        async () =>
+          prisma.reminder.create({
+            data: {
+              type: input.type,
+              orderId: input.orderId || null,
+              clientId: input.clientId || null,
+              dueAt: new Date(ms),
+              recurrence: recurrenceLabel,
+              assigneeId: input.assigneeId || null,
+              state: ReminderState.PENDING,
+            },
+          }),
+        (r) => r.id,
+      );
+      createdIds.push(row.id);
+    }
+
     revalidatePath("/reminders");
-    return { ok: true, id: created.id };
+    return { ok: true, id: createdIds[0], count: createdIds.length };
   } catch (e) {
     return mapError(e);
   }

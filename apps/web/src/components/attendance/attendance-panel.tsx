@@ -59,7 +59,14 @@ export function AttendancePanel({
         toast.error(res.error ?? "Something went wrong.");
         return;
       }
-      toast.success(label);
+      // Surface the task-reminder message returned by the action so the user
+      // sees it the moment they clock in / out. A matching Notification row is
+      // also written server-side for the notification centre.
+      if (res.reminder) {
+        toast.success(label, { description: res.reminder, duration: 8000 });
+      } else {
+        toast.success(label);
+      }
       setMyOpen(nextOpen);
       refetch();
     });

@@ -1,6 +1,7 @@
 import { TaskStatus, type TaskPriority } from "@crm-tool/db";
 
 import { prisma } from "@/lib/db";
+import { watStartOfDay, watStartOfNextDay } from "@/components/ops/wat";
 
 /**
  * Task vertical read models (EMP-03/05, ACC-02/03/04).
@@ -171,6 +172,55 @@ export function computeCompletionStats(tasks: TaskRow[]): CompletionStat[] {
       pct: e.total === 0 ? 0 : Math.round((e.completed / e.total) * 100),
     }))
     .sort((a, b) => a.person.name.localeCompare(b.person.name));
+}
+
+/**
+ * Today's task summary (WAT calendar day) for a single user. Used by the
+ * attendance flow to remind a user about what's on their plate when they
+ * clock in, and to confirm completion when they clock out. Counts tasks whose
+ * work `date` falls inside today's WAT day OR carry-over tasks dated before
+ * today that are still unfinished — mirrors the weekly view's carry-over rule.
+ */
+export interface TodayTaskSummary {
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  failed: number;
+}
+
+export async function getTodayTaskSummary(
+  userId: string,
+  now: Date = new Date(),
+): Promise<TodayTaskSummary> {
+  const todayStart = watStartOfDay(now);
+  const todayEnd = watStartOfNextDay(now);
+
+  const tasks = await prisma.task.findMany({
+    where: {
+      assigneeId: userId,
+      OR: [
+        { date: { gte: todayStart, lt: todayEnd } },
+        { date: { lt: todayStart }, status: { in: UNFINISHED } },
+      ],
+    },
+    select: { status: true },
+  });
+
+  const summary: TodayTaskSummary = {
+    total: tasks.length,
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+    failed: 0,
+  };
+  for (const t of tasks) {
+    if (t.status === TaskStatus.PENDING) summary.pending += 1;
+    else if (t.status === TaskStatus.IN_PROGRESS) summary.inProgress += 1;
+    else if (t.status === TaskStatus.COMPLETED) summary.completed += 1;
+    else if (t.status === TaskStatus.FAILED) summary.failed += 1;
+  }
+  return summary;
 }
 
 /** People list for assignment selectors and board grouping. */
