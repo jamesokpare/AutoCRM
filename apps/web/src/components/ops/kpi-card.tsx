@@ -49,8 +49,15 @@ export function KpiCard({
             <Badge variant="outline">Manual</Badge>
           )}
         </CardTitle>
-        <CardDescription>
-          {formatWatDate(kpi.periodStart)} – {formatWatDate(kpi.periodEnd)} (WAT)
+        <CardDescription className="flex flex-wrap items-center gap-1.5">
+          {kpi.category ? (
+            <Badge variant="outline" className="font-normal">
+              {kpi.category}
+            </Badge>
+          ) : null}
+          <span>
+            {formatWatDate(kpi.periodStart)} – {formatWatDate(kpi.periodEnd)} (WAT)
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

@@ -15,6 +15,12 @@ export interface ActionResult {
 
 export interface KpiInput {
   name: string;
+  /**
+   * Manual category label, e.g. "Customer Service" / "Operations". Free-form so
+   * teams can introduce new areas; the form offers a preset suggestion list.
+   * Null / empty = uncategorised.
+   */
+  category?: string | null;
   targetValue: number;
   unit?: string | null;
   /** ISO strings (UTC) for the effective period. */

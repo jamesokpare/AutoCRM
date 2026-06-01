@@ -82,6 +82,7 @@ export async function getKpiBoard(): Promise<KpiView[]> {
     return {
       id: k.id,
       name: k.name,
+      category: k.category ?? null,
       targetValue: k.targetValue,
       actualValue,
       unit: k.unit ?? null,

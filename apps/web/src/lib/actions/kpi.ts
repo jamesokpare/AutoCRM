@@ -75,6 +75,7 @@ export async function createKpi(input: KpiInput): Promise<ActionResult> {
         prisma.companyKPI.create({
           data: {
             name: input.name.trim(),
+            category: input.category?.trim() || null,
             targetValue: input.targetValue,
             currentValue: auto ? null : (input.currentValue ?? null),
             unit: input.unit?.trim() || null,
@@ -107,6 +108,7 @@ export async function updateKpi(id: string, input: KpiInput): Promise<ActionResu
           where: { id },
           data: {
             name: input.name.trim(),
+            category: input.category?.trim() || null,
             targetValue: input.targetValue,
             currentValue: auto ? null : (input.currentValue ?? null),
             unit: input.unit?.trim() || null,

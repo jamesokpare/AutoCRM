@@ -9,9 +9,30 @@
 
 export type AutoSource = "completed_jobs_week" | "avg_rating" | null;
 
+/**
+ * Suggested KPI categories surfaced in the create/edit form. Free-form strings
+ * are still allowed (the field is `String?` in the schema) — these are just the
+ * defaults so naming stays consistent across the board.
+ */
+export const KPI_CATEGORY_SUGGESTIONS = [
+  "Customer Service",
+  "Engineering",
+  "Product",
+  "Operations",
+  "Procurement",
+  "Mechanics",
+] as const;
+
+export type KpiCategorySuggestion = (typeof KPI_CATEGORY_SUGGESTIONS)[number];
+
+/** Label used in grouped views for KPIs that don't have a category set. */
+export const KPI_UNCATEGORISED_LABEL = "Uncategorised";
+
 export interface KpiView {
   id: string;
   name: string;
+  /** Free-form category label, e.g. "Customer Service". Null = uncategorised. */
+  category: string | null;
   targetValue: number;
   /** Effective actual: computed when autoComputed, else the stored manual value. */
   actualValue: number | null;
