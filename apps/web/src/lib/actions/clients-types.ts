@@ -22,12 +22,24 @@ export interface ClientImportRow {
   whatsapp?: string | null;
   address?: string | null;
   preferredChannel?: string | null;
+  /** Combined "Make & Model" cell — split server-side when separate fields aren't present. */
+  vehicleMakeModel?: string | null;
+  make?: string | null;
+  model?: string | null;
+  year?: string | null;
+  vin?: string | null;
+  description?: string | null;
+  orderStatus?: string | null;
+  itemRequested?: string | null;
+  externalOrderId?: string | null;
 }
 
 /** Outcome of a bulk client import. */
 export interface ClientImportResult {
   created: number;
   skipped: number;
+  vehiclesCreated: number;
+  ordersCreated: number;
   /** Human-readable, row-scoped messages (capped) for skipped/failed rows. */
   errors: string[];
 }
