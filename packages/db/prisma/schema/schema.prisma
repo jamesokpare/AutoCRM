@@ -334,8 +334,29 @@ model CompanyKPI {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  votes        KpiVote[]
+
   @@index([periodStart, periodEnd])
   @@index([category])
+}
+
+/// Per-user rating of how a KPI was performed (1..5 stars). Open to every
+/// authenticated team member; one vote per (kpi, user) — re-voting updates the
+/// existing row.
+model KpiVote {
+  id        String   @id @default(cuid())
+  kpiId     String
+  userId    String
+  rating    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kpi  CompanyKPI @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  user User       @relation("KpiVoteCaster", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([kpiId, userId])
+  @@index([kpiId])
+  @@index([userId])
 }
 
 model Reminder {

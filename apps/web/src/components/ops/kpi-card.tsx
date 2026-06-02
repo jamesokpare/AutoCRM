@@ -15,6 +15,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import type { KpiView } from "@/lib/queries/kpi-shared";
 import { formatWatDate } from "@/components/ops/wat";
 
+import { KpiVote } from "./kpi-vote";
 import { ProgressBar } from "./progress-bar";
 
 function formatVal(v: number | null, unit: string | null): string {
@@ -28,12 +29,14 @@ export function KpiCard({
   canEdit,
   onEdit,
   onDelete,
+  onVoteChanged,
   deleting,
 }: {
   kpi: KpiView;
   canEdit: boolean;
   onEdit?: (kpi: KpiView) => void;
   onDelete?: (id: string) => void;
+  onVoteChanged?: () => void;
   deleting?: boolean;
 }) {
   return (
@@ -74,6 +77,9 @@ export function KpiCard({
           {kpi.progressPct === null
             ? "No actual recorded yet"
             : `${kpi.progressPct}% of target`}
+        </div>
+        <div className="border-t pt-2">
+          <KpiVote kpiId={kpi.id} summary={kpi.votes} onChanged={onVoteChanged} />
         </div>
       </CardContent>
       {canEdit ? (

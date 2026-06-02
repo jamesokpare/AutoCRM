@@ -1,4 +1,6 @@
 import { OrderStatus } from "@crm-tool/db";
+import { auth } from "@crm-tool/auth";
+import { headers } from "next/headers";
 
 import { prisma } from "@/lib/db";
 import { watCurrentWeekRange } from "@/components/ops/wat";
@@ -16,7 +18,12 @@ import { watCurrentWeekRange } from "@/components/ops/wat";
  * admins can still create such KPIs from the UI by name.
  */
 
-import { type AutoSource, type KpiView, detectAutoSource } from "./kpi-shared";
+import {
+  type AutoSource,
+  type KpiView,
+  type KpiVoteSummary,
+  detectAutoSource,
+} from "./kpi-shared";
 
 // Re-exported so server-side importers (e.g. actions/kpi.ts) keep a single
 // import site. Client components import these from `./kpi-shared` directly to
@@ -68,9 +75,16 @@ export async function getKpiBoard(): Promise<KpiView[]> {
     (k) => k.autoComputed && detectAutoSource(k.name) === "avg_rating",
   );
 
-  const [completed, rating] = await Promise.all([
+  const session = await auth.api.getSession({ headers: await headers() });
+  const viewerId = (session?.user as { id?: string } | undefined)?.id ?? null;
+
+  const [completed, rating, voteSummaries] = await Promise.all([
     needsCompleted ? completedJobsThisWeek() : Promise.resolve(null),
     needsRating ? avgCustomerRating() : Promise.resolve(null),
+    voteSummariesByKpi(
+      kpis.map((k) => k.id),
+      viewerId,
+    ),
   ]);
 
   return kpis.map((k) => {
@@ -91,6 +105,52 @@ export async function getKpiBoard(): Promise<KpiView[]> {
       autoComputed: k.autoComputed,
       autoSource,
       progressPct: progress(actualValue, k.targetValue),
+      votes: voteSummaries.get(k.id) ?? { count: 0, average: null, myRating: null },
     };
   });
+}
+
+/**
+ * Loads `{ count, average, myRating }` per KPI in a single round-trip:
+ *   - one `groupBy` for aggregates over all voters,
+ *   - one `findMany` for the current viewer's own votes (skipped if signed out).
+ */
+async function voteSummariesByKpi(
+  kpiIds: string[],
+  viewerId: string | null,
+): Promise<Map<string, KpiVoteSummary>> {
+  const result = new Map<string, KpiVoteSummary>();
+  if (kpiIds.length === 0) return result;
+
+  const [groups, mine] = await Promise.all([
+    prisma.kpiVote.groupBy({
+      by: ["kpiId"],
+      where: { kpiId: { in: kpiIds } },
+      _avg: { rating: true },
+      _count: { _all: true },
+    }),
+    viewerId
+      ? prisma.kpiVote.findMany({
+          where: { kpiId: { in: kpiIds }, userId: viewerId },
+          select: { kpiId: true, rating: true },
+        })
+      : Promise.resolve([] as { kpiId: string; rating: number }[]),
+  ]);
+
+  const myByKpi = new Map(mine.map((v) => [v.kpiId, v.rating]));
+  for (const g of groups) {
+    const avg = g._avg.rating;
+    result.set(g.kpiId, {
+      count: g._count._all,
+      average: avg === null || avg === undefined ? null : Math.round(avg * 100) / 100,
+      myRating: myByKpi.get(g.kpiId) ?? null,
+    });
+  }
+  // Make sure KPIs with no votes still get an entry with the viewer's null.
+  for (const id of kpiIds) {
+    if (!result.has(id)) {
+      result.set(id, { count: 0, average: null, myRating: myByKpi.get(id) ?? null });
+    }
+  }
+  return result;
 }

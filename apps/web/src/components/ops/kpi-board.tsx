@@ -172,6 +172,7 @@ export function KpiBoard({
                     canEdit={canEdit}
                     onEdit={openEdit}
                     onDelete={remove}
+                    onVoteChanged={() => refetch()}
                     deleting={deleting}
                   />
                 ))}
@@ -188,6 +189,7 @@ export function KpiBoard({
               canEdit={canEdit}
               onEdit={openEdit}
               onDelete={remove}
+              onVoteChanged={() => refetch()}
               deleting={deleting}
             />
           ))}
