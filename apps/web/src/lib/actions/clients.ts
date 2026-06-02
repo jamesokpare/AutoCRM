@@ -496,6 +496,51 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
   }
 }
 
+/**
+ * Bulk-update the relationship status of several clients in one call. Writes a
+ * single ActivityLog entry capturing the count, so a bulk action is auditable
+ * without flooding the log with one row per client.
+ */
+export async function setClientStatusBulk(
+  clientIds: string[],
+  status: ClientStatus,
+): Promise<ActionResult<{ updated: number }>> {
+  try {
+    const user = await requireEdit();
+    const parsed = parseClientStatus(status);
+    if (!parsed) return { ok: false, error: "Invalid client status." };
+    if (!Array.isArray(clientIds) || clientIds.length === 0) {
+      return { ok: false, error: "No clients selected." };
+    }
+    // Hard cap mirrors the bulk-import cap — protects against accidental
+    // multi-thousand-row updates from a runaway selection.
+    if (clientIds.length > MAX_IMPORT_ROWS) {
+      return { ok: false, error: `Too many clients — max ${MAX_IMPORT_ROWS} at once.` };
+    }
+
+    const { count } = await prisma.client.updateMany({
+      where: { id: { in: clientIds } },
+      data: { status: parsed },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        entityType: "Client",
+        entityId: "*",
+        action: "status_bulk_changed",
+        userId: user.id,
+        metadata: { ids: clientIds, to: parsed, updated: count },
+      },
+    });
+
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { updated: count } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
 /** Change a client's relationship status (PROSPECT/ACTIVE/INACTIVE/ARCHIVED). */
 export async function setClientStatus(
   clientId: string,

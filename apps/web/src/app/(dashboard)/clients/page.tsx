@@ -63,7 +63,7 @@ export default async function ClientsPage() {
         </div>
       </div>
 
-      <ClientTable initialData={clients} />
+      <ClientTable initialData={clients} canBulkSend={canBulkSend} />
     </div>
   );
 }
