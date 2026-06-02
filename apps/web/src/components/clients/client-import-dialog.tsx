@@ -22,6 +22,7 @@ import { Textarea } from "@crm-tool/ui/components/textarea";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 import { importClients } from "@/lib/actions/clients";
 import type { ClientImportRow } from "@/lib/actions/clients-types";
@@ -162,9 +163,27 @@ export function ClientImportDialog({ trigger }: { trigger: React.ReactElement })
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setText(String(reader.result ?? ""));
     reader.onerror = () => toast.error("Could not read that file.");
-    reader.readAsText(file);
+    const isXlsx = /\.(xlsx|xls|xlsm|xlsb|ods)$/i.test(file.name);
+    if (isXlsx) {
+      reader.onload = () => {
+        try {
+          const wb = XLSX.read(reader.result, { type: "array" });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          if (!sheet) {
+            toast.error("That spreadsheet has no sheets.");
+            return;
+          }
+          setText(XLSX.utils.sheet_to_csv(sheet));
+        } catch {
+          toast.error("Could not parse that spreadsheet.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = () => setText(String(reader.result ?? ""));
+      reader.readAsText(file);
+    }
   }
 
   function downloadTemplate() {
@@ -215,18 +234,19 @@ export function ClientImportDialog({ trigger }: { trigger: React.ReactElement })
 
         <div className="flex flex-col gap-4">
           <p className="text-xs text-muted-foreground">
-            Upload a <code>.csv</code> file or paste rows below. The first line may be a header
-            (<code>name, phone, email, whatsapp, address, preferredChannel</code>) in any order;
-            otherwise columns are read in that order. Only <strong>name</strong> is required.
+            Upload a <code>.csv</code> or <code>.xlsx</code> file or paste rows below. The first
+            line may be a header (<code>name, phone, email, whatsapp, address, preferredChannel</code>)
+            in any order; otherwise columns are read in that order. Only <strong>name</strong> is
+            required.
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="csvFile">CSV file</Label>
+              <Label htmlFor="csvFile">CSV or Excel file</Label>
               <input
                 id="csvFile"
                 type="file"
-                accept=".csv,text/csv,text/plain"
+                accept=".csv,.xlsx,.xls,.xlsm,.xlsb,.ods,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={onFile}
                 className="text-xs file:mr-2 file:rounded-none file:border file:border-input file:bg-transparent file:px-2 file:py-1 file:text-xs"
               />
