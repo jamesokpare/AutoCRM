@@ -40,6 +40,7 @@ model User {
   reminders       Reminder[]          @relation("ReminderAssignee")
   clientUpdates   ClientUpdate[]      @relation("ClientUpdateAuthor")
   attendance      Attendance[]        @relation("UserAttendance")
+  kpiVotes        KpiVote[]           @relation("KpiVoteCaster")
 
   @@unique([email])
   @@map("user")

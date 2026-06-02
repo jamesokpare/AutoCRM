@@ -43,6 +43,17 @@ export interface KpiView {
   autoSource: AutoSource;
   /** 0..100, clamped; null when no actual is available. */
   progressPct: number | null;
+  /** Team voting on how this KPI was performed (1..5 stars). */
+  votes: KpiVoteSummary;
+}
+
+export interface KpiVoteSummary {
+  /** Total number of distinct voters. */
+  count: number;
+  /** Mean rating (1..5), or null when nobody has voted yet. */
+  average: number | null;
+  /** Current viewer's rating (1..5), or null if they haven't voted. */
+  myRating: number | null;
 }
 
 /**
