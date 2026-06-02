@@ -615,6 +615,46 @@ export async function deleteClient(clientId: string): Promise<ActionResult<{ id:
   }
 }
 
+/**
+ * Wipe every client (and its cascaded vehicles, orders, parts, feedback,
+ * communications, reminders, updates). Writes a single ActivityLog entry with
+ * the count for the audit trail. Open to every signed-in team member, matching
+ * the single-row `deleteClient` policy — the UI guards with a typed-confirmation
+ * dialog. Returns the number of clients deleted.
+ */
+export async function deleteAllClients(
+  confirmation: string,
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    const user = await requireEdit();
+    if (confirmation !== "DELETE ALL CLIENTS") {
+      return { ok: false, error: "Confirmation phrase did not match." };
+    }
+
+    const count = await prisma.client.count();
+    if (count === 0) {
+      return { ok: true, data: { deleted: 0 } };
+    }
+
+    await prisma.activityLog.create({
+      data: {
+        entityType: "Client",
+        action: "bulk_deleted",
+        userId: user.id,
+        metadata: { count },
+      },
+    });
+
+    const { count: deleted } = await prisma.client.deleteMany({});
+
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { deleted } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
 export async function updateClient(
   clientId: string,
   form: FormData,

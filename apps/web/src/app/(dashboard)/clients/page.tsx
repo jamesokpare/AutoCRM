@@ -4,6 +4,7 @@ import { Button } from "@crm-tool/ui/components/button";
 import { headers } from "next/headers";
 
 import { BulkMessageDialog } from "@/components/clients/bulk-message-dialog";
+import { ClientBulkDeleteDialog } from "@/components/clients/client-bulk-delete-dialog";
 import { ClientImportDialog } from "@/components/clients/client-import-dialog";
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { ClientTable } from "@/components/clients/client-table";
@@ -49,6 +50,15 @@ export default async function ClientsPage() {
               </Button>
             }
           />
+          {clients.length > 0 && (
+            <ClientBulkDeleteDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  Delete all
+                </Button>
+              }
+            />
+          )}
           <ClientIntakeForm trigger={<Button size="sm">New client</Button>} />
         </div>
       </div>
