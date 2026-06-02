@@ -15,7 +15,9 @@ export type Capability =
   | "use_ai_apology" // Use AI apology drafting
   | "create_assign_tasks" // Create/assign tasks (to anyone)
   | "grade_performance" // Grade peer performance
-  | "set_kpi_targets"; // Set company KPI targets
+  | "set_kpi_targets" // Set company KPI targets
+  | "manage_messaging" // Configure outbound WhatsApp/Email + send bulk messages
+  | "send_bulk_messages"; // Send bulk WhatsApp/Email to clients
 
 /**
  * Capability → roles matrix (SPEC §5 Appendix A).
@@ -45,6 +47,8 @@ const MATRIX: Record<Capability, Role[]> = {
     Role.PARTS_STAFF,
   ],
   set_kpi_targets: [Role.ADMIN, Role.MANAGER],
+  manage_messaging: [Role.ADMIN, Role.MANAGER],
+  send_bulk_messages: [Role.ADMIN, Role.MANAGER, Role.SERVICE_ADVISOR],
 };
 
 /**

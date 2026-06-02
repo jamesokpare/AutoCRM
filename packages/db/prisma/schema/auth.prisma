@@ -41,6 +41,8 @@ model User {
   clientUpdates   ClientUpdate[]      @relation("ClientUpdateAuthor")
   attendance      Attendance[]        @relation("UserAttendance")
   kpiVotes        KpiVote[]           @relation("KpiVoteCaster")
+  bulkMessages    BulkMessage[]       @relation("BulkMessageSender")
+  messagingSettingsUpdates MessagingSettings[] @relation("MessagingSettingsUpdatedBy")
 
   @@unique([email])
   @@map("user")
