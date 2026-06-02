@@ -205,6 +205,10 @@ model Order {
   // Free-text technician name — used when the technician isn't an app user.
   // When both fields are set, the free-text name wins in display fallbacks.
   assignedTechName String?
+  // Free-text item or part the client requested at intake.
+  itemRequested String?
+  // External / customer-supplied order reference (distinct from the cuid `id`).
+  externalOrderId String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

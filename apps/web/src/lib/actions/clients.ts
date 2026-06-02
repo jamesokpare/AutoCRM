@@ -347,6 +347,8 @@ export async function createClientFull(form: FormData): Promise<ActionResult<{ i
                 receivedDate: parseDate(form.get("receivedDate")) ?? new Date(),
                 expectedDate: dueToday ? new Date() : parseDate(form.get("expectedDate")),
                 assignedTechName: str(form.get("assignedTechName")),
+                itemRequested: str(form.get("itemRequested")),
+                externalOrderId: str(form.get("externalOrderId")),
                 parts: parts.length ? { create: parts } : undefined,
               },
             }),
