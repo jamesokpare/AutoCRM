@@ -639,6 +639,7 @@ export async function deleteAllClients(
     await prisma.activityLog.create({
       data: {
         entityType: "Client",
+        entityId: "*",
         action: "bulk_deleted",
         userId: user.id,
         metadata: { count },
