@@ -56,9 +56,12 @@ const COLUMN_LABEL: Record<keyof ClientImportRow, string> = {
 };
 
 /**
- * Header-cell aliases (lower-cased) → field. Lets columns arrive in any order
- * and under common spreadsheet names. Unknown headers are ignored at import
- * time, so columns like "Date Logged" or "Logged By" pass through harmlessly.
+ * Header-cell aliases → field. Keys and incoming headers both pass through
+ * `normalizeHeader()`, which lowercases and collapses runs of whitespace and
+ * punctuation (`/`, `&`, `-`, `_`, `.`, `#`) to a single space. That way
+ * "Item / Part Requested", "Item/Part Requested", and "item-part-requested"
+ * all resolve to the same alias. Unknown headers are ignored at import time,
+ * so columns like "Date Logged" or "Logged By" pass through harmlessly.
  */
 const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   // Client
@@ -74,7 +77,6 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   tel: "phone",
   email: "email",
   "email address": "email",
-  "e-mail": "email",
   whatsapp: "whatsapp",
   "whatsapp number": "whatsapp",
   address: "address",
@@ -82,9 +84,9 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   "preferred channel": "preferredChannel",
   channel: "preferredChannel",
   // Vehicle
-  "vehicle make & model": "vehicleMakeModel",
+  "vehicle make model": "vehicleMakeModel",
   "vehicle make and model": "vehicleMakeModel",
-  "make & model": "vehicleMakeModel",
+  "make model": "vehicleMakeModel",
   "make and model": "vehicleMakeModel",
   vehicle: "vehicleMakeModel",
   make: "make",
@@ -93,16 +95,16 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   "vehicle year": "year",
   vin: "vin",
   "vin number": "vin",
-  "vin#": "vin",
-  // Order
+  // Order — "Issue Description" and "Description" collapse to the same field;
+  // "Parts" and "Item / Part Requested" collapse to the same itemRequested field.
   "issue description": "description",
   "order description": "description",
   description: "description",
   issue: "description",
   "order status": "orderStatus",
   status: "orderStatus",
-  "item / part requested": "itemRequested",
-  "item / part": "itemRequested",
+  "item part requested": "itemRequested",
+  "item part": "itemRequested",
   "item requested": "itemRequested",
   "part requested": "itemRequested",
   "parts requested": "itemRequested",
@@ -110,10 +112,23 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   part: "itemRequested",
   parts: "itemRequested",
   "order id": "externalOrderId",
-  "order #": "externalOrderId",
   "order number": "externalOrderId",
   "external order id": "externalOrderId",
 };
+
+/**
+ * Normalize a header cell for alias lookup: lowercase, treat punctuation
+ * (`/&-_.#`) as whitespace, collapse runs of whitespace to a single space, and
+ * trim. Lets "Item / Part Requested", "Item/Part Requested", and
+ * "item-part-requested" all match the same canonical alias key.
+ */
+function normalizeHeader(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[/&\-_.#]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 const TEMPLATE =
   "name,phone,email,whatsapp,address,preferredChannel,vehicleMakeModel,year,vin,description,orderStatus,itemRequested,externalOrderId\n" +
@@ -169,7 +184,7 @@ function toRows(text: string): ClientImportRow[] {
   const grid = parseCsv(text);
   if (grid.length === 0) return [];
 
-  const headerCells = grid[0].map((h) => h.trim().toLowerCase());
+  const headerCells = grid[0].map((h) => normalizeHeader(h));
   const hasHeader = headerCells.some((h) => h in HEADER_ALIASES);
 
   const colMap: (keyof ClientImportRow | null)[] = hasHeader
