@@ -59,7 +59,7 @@ export function KpiBoard({
   /** Category filter: ALL = no filter; "" sentinel handled separately. */
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL);
   /** When on, group cards under a heading per category. */
-  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [groupByCategory, setGroupByCategory] = useState(true);
 
   const categories = useMemo(() => categoriesPresent(kpis), [kpis]);
 
