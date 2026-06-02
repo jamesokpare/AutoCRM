@@ -96,6 +96,7 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   "vin#": "vin",
   // Order
   "issue description": "description",
+  "order description": "description",
   description: "description",
   issue: "description",
   "order status": "orderStatus",
@@ -104,8 +105,10 @@ const HEADER_ALIASES: Record<string, keyof ClientImportRow> = {
   "item / part": "itemRequested",
   "item requested": "itemRequested",
   "part requested": "itemRequested",
+  "parts requested": "itemRequested",
   item: "itemRequested",
   part: "itemRequested",
+  parts: "itemRequested",
   "order id": "externalOrderId",
   "order #": "externalOrderId",
   "order number": "externalOrderId",
