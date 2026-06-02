@@ -116,6 +116,7 @@ const clientListSelect = {
   email: true,
   status: true,
   serviceStatus: true,
+  createdAt: true,
   updatedAt: true,
   vehicles: {
     select: { id: true, make: true, model: true, year: true, vin: true },
@@ -136,6 +137,13 @@ const clientListSelect = {
       parts: { select: { availability: true } },
     },
     orderBy: { updatedAt: "desc" },
+  },
+  // Most recent communication (any state) — drives the "last contacted" bucket
+  // separators in the client list. Take 1 to keep the row payload light.
+  communications: {
+    select: { sentAt: true, createdAt: true },
+    orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
+    take: 1,
   },
 } satisfies Prisma.ClientSelect;
 

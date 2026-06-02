@@ -21,7 +21,7 @@ import {
 } from "@crm-tool/ui/components/table";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { listClientsAction } from "@/lib/actions/clients";
 import type { ClientListFilters, ClientListRow } from "@/lib/queries/clients";
@@ -66,6 +66,36 @@ function primaryOrder(client: ClientListRow): ClientListRow["orders"][number] | 
   return client.orders[0];
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Recency buckets used to group clients in the list. Order matters — rows fall
+ *  into the first bucket whose `maxAgeDays` they satisfy. */
+const RECENCY_BUCKETS: { key: string; label: string; maxAgeDays: number | null }[] = [
+  { key: "2w", label: "Last 2 weeks", maxAgeDays: 14 },
+  { key: "1m", label: "2 weeks – 1 month", maxAgeDays: 30 },
+  { key: "3m", label: "1 – 3 months", maxAgeDays: 90 },
+  { key: "6m", label: "3 – 6 months", maxAgeDays: 180 },
+  { key: "1y", label: "6 months – 1 year", maxAgeDays: 365 },
+  { key: "older", label: "Over a year ago", maxAgeDays: null },
+];
+
+/** Most recent of: client createdAt, or latest communication (sentAt fallback createdAt). */
+function lastActivityAt(client: ClientListRow): Date {
+  const created = new Date(client.createdAt).getTime();
+  const comm = client.communications[0];
+  const commTs = comm ? new Date(comm.sentAt ?? comm.createdAt).getTime() : 0;
+  return new Date(Math.max(created, commTs));
+}
+
+function bucketIndex(activity: Date, now: number): number {
+  const ageDays = (now - activity.getTime()) / DAY_MS;
+  for (let i = 0; i < RECENCY_BUCKETS.length; i++) {
+    const max = RECENCY_BUCKETS[i].maxAgeDays;
+    if (max === null || ageDays <= max) return i;
+  }
+  return RECENCY_BUCKETS.length - 1;
+}
+
 export function ClientTable({
   initialData,
   initialFilters = {},
@@ -108,7 +138,26 @@ export function ClientTable({
     // Inherits refetchOnWindowFocus from the global QueryClient (SPEC §2).
   });
 
-  const rows = data ?? [];
+  const rawRows = data ?? [];
+
+  // Sort by most recent activity (added or last contacted) descending so the
+  // recency buckets render in order. Computed once per data change.
+  const rows = useMemo(() => {
+    return [...rawRows].sort(
+      (a, b) => lastActivityAt(b).getTime() - lastActivityAt(a).getTime(),
+    );
+  }, [rawRows]);
+
+  // Pre-compute the bucket boundaries so each render of the table body knows
+  // exactly where to slot in a separator row.
+  const bucketed = useMemo(() => {
+    const now = Date.now();
+    const result: { bucketIdx: number; row: ClientListRow }[] = [];
+    for (const row of rows) {
+      result.push({ bucketIdx: bucketIndex(lastActivityAt(row), now), row });
+    }
+    return result;
+  }, [rows]);
 
   // Prune selected IDs that are no longer in the visible result set when
   // filters or the search query change — otherwise a bulk action could fire
@@ -267,19 +316,32 @@ export function ClientTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 ? (
+            {bucketed.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={15} className="text-center text-muted-foreground">
                   No clients match these filters.
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((client) => {
+              bucketed.map(({ row: client, bucketIdx }, i) => {
                 const order = primaryOrder(client);
                 const vehicle = order?.vehicle ?? client.vehicles[0];
                 const isSelected = selectedIds.has(client.id);
+                const prevBucketIdx = i === 0 ? -1 : bucketed[i - 1].bucketIdx;
+                const showHeader = bucketIdx !== prevBucketIdx;
                 return (
-                  <TableRow key={client.id} data-state={isSelected ? "selected" : undefined}>
+                  <Fragment key={client.id}>
+                    {showHeader && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell
+                          colSpan={15}
+                          className="border-y bg-muted/40 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {RECENCY_BUCKETS[bucketIdx].label}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    <TableRow data-state={isSelected ? "selected" : undefined}>
                     <TableCell>
                       <Checkbox
                         checked={isSelected}
@@ -345,6 +407,7 @@ export function ClientTable({
                       <ClientRowDeleteButton clientId={client.id} clientName={client.name} />
                     </TableCell>
                   </TableRow>
+                  </Fragment>
                 );
               })
             )}
