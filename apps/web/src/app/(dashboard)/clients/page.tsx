@@ -1,9 +1,14 @@
+import { auth } from "@crm-tool/auth";
+import type { Role } from "@crm-tool/db";
 import { Button } from "@crm-tool/ui/components/button";
+import { headers } from "next/headers";
 
+import { BulkMessageDialog } from "@/components/clients/bulk-message-dialog";
 import { ClientImportDialog } from "@/components/clients/client-import-dialog";
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { ClientTable } from "@/components/clients/client-table";
 import { getClientList } from "@/lib/queries/clients";
+import { can } from "@/lib/rbac";
 
 /**
  * CLT / Module B: client directory. Lists all clients with the same searchable
@@ -11,7 +16,12 @@ import { getClientList } from "@/lib/queries/clients";
  * order — is open to every signed-in team member.
  */
 export default async function ClientsPage() {
-  const clients = await getClientList();
+  const [clients, session] = await Promise.all([
+    getClientList(),
+    auth.api.getSession({ headers: await headers() }),
+  ]);
+  const roles = ((session?.user as { roles?: Role[] } | undefined)?.roles ?? []) as Role[];
+  const canBulkSend = can(roles, "send_bulk_messages");
 
   return (
     <div className="space-y-4">
@@ -23,6 +33,15 @@ export default async function ClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {canBulkSend && (
+            <BulkMessageDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  Bulk message
+                </Button>
+              }
+            />
+          )}
           <ClientImportDialog
             trigger={
               <Button size="sm" variant="outline">

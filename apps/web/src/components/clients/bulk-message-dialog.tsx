@@ -1,0 +1,393 @@
+"use client";
+
+import { Channel } from "@crm-tool/db/enums";
+import { Badge } from "@crm-tool/ui/components/badge";
+import { Button } from "@crm-tool/ui/components/button";
+import { Checkbox } from "@crm-tool/ui/components/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@crm-tool/ui/components/dialog";
+import { Input } from "@crm-tool/ui/components/input";
+import { Label } from "@crm-tool/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm-tool/ui/components/select";
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@crm-tool/ui/components/tabs";
+import { Textarea } from "@crm-tool/ui/components/textarea";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
+
+import { listBulkClientOptions, sendBulkMessages } from "@/lib/actions/messaging";
+import type {
+  BulkClientOption,
+  BulkSendResult,
+} from "@/lib/actions/messaging-types";
+
+const CHANNEL_OPTIONS = [
+  { value: Channel.WHATSAPP, label: "WhatsApp" },
+  { value: Channel.EMAIL, label: "Email" },
+];
+
+const SAMPLE_TEMPLATES = {
+  WHATSAPP: `Hi {{firstName}}, this is Drivewell. A quick update on your {{vehicle}}: we'll have it ready as planned. Let us know if you have any questions.`,
+  EMAIL: `Hi {{firstName}},
+
+Thanks for trusting Drivewell with your {{vehicle}}. We wanted to let you know about our latest service offers.
+
+— The Drivewell team`,
+};
+
+export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"recipients" | "compose">("recipients");
+  const [channel, setChannel] = useState<Channel>(Channel.WHATSAPP);
+  const [audience, setAudience] = useState<"all" | "selected">("all");
+  const [clients, setClients] = useState<BulkClientOption[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [subject, setSubject] = useState("");
+  const [content, setContent] = useState(SAMPLE_TEMPLATES.WHATSAPP);
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<BulkSendResult | null>(null);
+
+  useEffect(() => {
+    if (!open || clients) return;
+    let cancelled = false;
+    listBulkClientOptions().then((rows) => {
+      if (!cancelled) setClients(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, clients]);
+
+  useEffect(() => {
+    // Swap the sample when the channel changes only if the user hasn't edited it
+    // off the default for the other channel.
+    if (
+      content === SAMPLE_TEMPLATES.WHATSAPP ||
+      content === SAMPLE_TEMPLATES.EMAIL
+    ) {
+      setContent(channel === Channel.EMAIL ? SAMPLE_TEMPLATES.EMAIL : SAMPLE_TEMPLATES.WHATSAPP);
+    }
+  }, [channel, content]);
+
+  const filtered = useMemo(() => {
+    if (!clients) return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q) ||
+        (c.phone ?? "").includes(q) ||
+        (c.whatsapp ?? "").includes(q),
+    );
+  }, [clients, search]);
+
+  const reachable = useMemo(() => {
+    if (!clients) return 0;
+    const universe = audience === "all"
+      ? clients
+      : clients.filter((c) => selectedIds.has(c.id));
+    return universe.filter((c) =>
+      channel === Channel.WHATSAPP ? Boolean(c.whatsapp || c.phone) : Boolean(c.email),
+    ).length;
+  }, [clients, audience, selectedIds, channel]);
+
+  const totalSelected = audience === "all" ? clients?.length ?? 0 : selectedIds.size;
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const send = () => {
+    if (totalSelected === 0) {
+      toast.error("No recipients selected.");
+      return;
+    }
+    if (!content.trim()) {
+      toast.error("Message body is required.");
+      return;
+    }
+    if (channel === Channel.EMAIL && !subject.trim()) {
+      toast.error("Subject is required for email.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await sendBulkMessages({
+        channel,
+        subject: channel === Channel.EMAIL ? subject : undefined,
+        content,
+        audience:
+          audience === "all"
+            ? { mode: "all" }
+            : { mode: "selected", clientIds: Array.from(selectedIds) },
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? "Send failed.");
+        return;
+      }
+      setResult(res.data!);
+      toast.success(
+        `Sent ${res.data!.sent} · failed ${res.data!.failed} · skipped ${res.data!.skipped}`,
+      );
+    });
+  };
+
+  const reset = () => {
+    setResult(null);
+    setSelectedIds(new Set());
+    setSearch("");
+    setSubject("");
+    setAudience("all");
+    setTab("recipients");
+    setContent(channel === Channel.EMAIL ? SAMPLE_TEMPLATES.EMAIL : SAMPLE_TEMPLATES.WHATSAPP);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger render={trigger} />
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Bulk message clients</DialogTitle>
+        </DialogHeader>
+
+        {result ? (
+          <ResultPanel result={result} onClose={() => setOpen(false)} />
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="bm-channel">Channel</Label>
+                <Select
+                  items={CHANNEL_OPTIONS}
+                  value={channel}
+                  onValueChange={(v) => setChannel(v as Channel)}
+                >
+                  <SelectTrigger id="bm-channel">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CHANNEL_OPTIONS.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Audience</Label>
+                <div className="flex gap-2">
+                  <Button
+                    size="xs"
+                    variant={audience === "all" ? "default" : "outline"}
+                    onClick={() => setAudience("all")}
+                    type="button"
+                  >
+                    All clients ({clients?.length ?? "…"})
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant={audience === "selected" ? "default" : "outline"}
+                    onClick={() => setAudience("selected")}
+                    type="button"
+                  >
+                    Selected ({selectedIds.size})
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "recipients" | "compose")}>
+              <TabsList>
+                <TabsTab value="recipients">Recipients</TabsTab>
+                <TabsTab value="compose">Compose</TabsTab>
+              </TabsList>
+
+              <TabsPanel value="recipients">
+                <div className="space-y-2">
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search clients…"
+                    className="h-8"
+                  />
+                  <div className="max-h-72 overflow-y-auto rounded border">
+                    {!clients ? (
+                      <div className="p-3 text-xs text-muted-foreground">Loading…</div>
+                    ) : filtered.length === 0 ? (
+                      <div className="p-3 text-xs text-muted-foreground">No clients.</div>
+                    ) : (
+                      <ul className="divide-y text-xs">
+                        {filtered.map((c) => {
+                          const dest =
+                            channel === Channel.WHATSAPP ? c.whatsapp ?? c.phone : c.email;
+                          return (
+                            <li
+                              key={c.id}
+                              className="flex items-center gap-2 px-2 py-1.5"
+                            >
+                              <Checkbox
+                                checked={selectedIds.has(c.id)}
+                                onCheckedChange={() => {
+                                  toggle(c.id);
+                                  if (audience !== "selected") setAudience("selected");
+                                }}
+                              />
+                              <span className="flex-1 truncate">{c.name}</span>
+                              <span
+                                className={
+                                  dest
+                                    ? "text-muted-foreground"
+                                    : "text-destructive"
+                                }
+                              >
+                                {dest ?? "no destination"}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {audience === "all"
+                      ? `Will send to ${reachable} of ${clients?.length ?? 0} clients (others lack a ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address).`
+                      : `${reachable} of ${selectedIds.size} selected clients have a usable ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address.`}
+                  </p>
+                </div>
+              </TabsPanel>
+
+              <TabsPanel value="compose">
+                <div className="space-y-3">
+                  {channel === Channel.EMAIL && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="bm-subject">Subject</Label>
+                      <Input
+                        id="bm-subject"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        placeholder="A short update from Drivewell"
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bm-content">Message</Label>
+                    <Textarea
+                      id="bm-content"
+                      rows={10}
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Placeholders:{" "}
+                      <Badge variant="outline">{`{{name}}`}</Badge>{" "}
+                      <Badge variant="outline">{`{{firstName}}`}</Badge>{" "}
+                      <Badge variant="outline">{`{{vehicle}}`}</Badge>{" "}
+                      <Badge variant="outline">{`{{phone}}`}</Badge>{" "}
+                      <Badge variant="outline">{`{{email}}`}</Badge>
+                    </p>
+                  </div>
+                </div>
+              </TabsPanel>
+            </Tabs>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)} type="button">
+                Cancel
+              </Button>
+              <Button
+                onClick={send}
+                disabled={pending || totalSelected === 0}
+                type="button"
+              >
+                {pending
+                  ? "Sending…"
+                  : `Send to ${reachable} ${reachable === 1 ? "client" : "clients"}`}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ResultPanel({
+  result,
+  onClose,
+}: {
+  result: BulkSendResult;
+  onClose: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Badge>Sent {result.sent}</Badge>
+        <Badge variant="outline">Failed {result.failed}</Badge>
+        <Badge variant="outline">Skipped {result.skipped}</Badge>
+      </div>
+      {result.details.length > 0 && (
+        <div className="max-h-64 overflow-y-auto rounded border">
+          <ul className="divide-y text-xs">
+            {result.details.map((d) => (
+              <li key={d.clientId} className="flex items-center gap-2 px-2 py-1.5">
+                <span className="flex-1 truncate">{d.clientName}</span>
+                <span className="text-muted-foreground">{d.destination || "—"}</span>
+                <Badge
+                  variant={
+                    d.state === "SENT"
+                      ? "default"
+                      : d.state === "FAILED"
+                        ? "destructive"
+                        : "outline"
+                  }
+                >
+                  {d.state}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.details.some((d) => d.error) && (
+        <ul className="space-y-1 text-xs text-destructive">
+          {result.details
+            .filter((d) => d.error)
+            .map((d) => (
+              <li key={`err-${d.clientId}`}>
+                {d.clientName}: {d.error}
+              </li>
+            ))}
+        </ul>
+      )}
+      <DialogFooter>
+        <Button onClick={onClose} type="button">
+          Done
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}

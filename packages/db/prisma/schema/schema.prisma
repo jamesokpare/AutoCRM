@@ -108,6 +108,21 @@ enum NotificationType {
   GENERIC
 }
 
+// Outbound email provider for the messaging settings (admin/messaging).
+// RESEND uses the Resend HTTPS REST API; SMTP is reserved for future use.
+enum EmailProvider {
+  RESEND
+  SMTP
+}
+
+// Per-recipient delivery state for a BulkMessage row.
+enum BulkRecipientState {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Domain models (SPEC §3)
 // ─────────────────────────────────────────────────────────────
@@ -133,6 +148,7 @@ model Client {
   communications Communication[]
   reminders      Reminder[]
   updates        ClientUpdate[]
+  bulkMessages   BulkMessageRecipient[]
 
   @@index([name])
   @@index([serviceStatus])
@@ -396,6 +412,76 @@ model Notification {
 
   @@index([userId])
   @@index([read])
+}
+
+/// Singleton row holding the workshop's outbound messaging credentials. The
+/// `singleton` literal in `key` keeps it unique without relying on application
+/// code. Credentials are stored as-is — restrict the admin/messaging page to
+/// ADMIN/MANAGER via the `manage_messaging` capability.
+model MessagingSettings {
+  id  String @id @default(cuid())
+  key String @unique @default("singleton")
+
+  // WhatsApp Cloud API (Meta Graph API)
+  whatsappEnabled         Boolean @default(false)
+  whatsappPhoneNumberId   String?
+  whatsappAccessToken     String?
+  whatsappBusinessNumber  String?
+  whatsappDisplayName     String?
+
+  // Email
+  emailEnabled     Boolean        @default(false)
+  emailProvider    EmailProvider?
+  emailFromName    String?
+  emailFromAddress String?
+  emailApiKey      String?
+  emailSmtpHost    String?
+  emailSmtpPort    Int?
+  emailSmtpUser    String?
+  emailSmtpPassword String?
+  emailSmtpSecure  Boolean?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("MessagingSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// A single bulk-send campaign. One row per channel+content+sender; per-client
+/// dispatch state lives on `BulkMessageRecipient`.
+model BulkMessage {
+  id          String   @id @default(cuid())
+  channel     Channel
+  subject     String?
+  content     String
+  senderId    String
+  totalCount  Int      @default(0)
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  sender     User                   @relation("BulkMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipients BulkMessageRecipient[]
+
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model BulkMessageRecipient {
+  id            String             @id @default(cuid())
+  bulkMessageId String
+  clientId      String
+  destination   String
+  state         BulkRecipientState @default(PENDING)
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+
+  bulkMessage BulkMessage @relation(fields: [bulkMessageId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([bulkMessageId])
+  @@index([clientId])
 }
 
 model ActivityLog {

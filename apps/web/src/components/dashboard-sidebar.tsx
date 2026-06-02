@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  MessageSquare,
   Menu,
   Shield,
   Star,
@@ -46,6 +47,7 @@ const NAV: NavItem[] = [
   { href: "/attendance", label: "Attendance", icon: Clock },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/users", label: "User Admin", icon: Shield, adminOnly: true },
+  { href: "/admin/messaging", label: "Messaging", icon: MessageSquare, adminOnly: true },
   { href: "/profile", label: "Profile", icon: Users },
 ];
 
