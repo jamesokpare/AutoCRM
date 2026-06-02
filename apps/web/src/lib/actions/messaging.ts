@@ -4,9 +4,11 @@ import { auth } from "@crm-tool/auth";
 import {
   BulkRecipientState,
   Channel,
+  ClientStatus,
   CommunicationState,
   CommunicationType,
   EmailProvider,
+  Prisma,
   type Role,
 } from "@crm-tool/db";
 import { headers } from "next/headers";
@@ -277,9 +279,18 @@ export async function listBulkClientOptions(): Promise<BulkClientOption[]> {
       email: true,
       phone: true,
       whatsapp: true,
+      status: true,
     },
   });
   return rows;
+}
+
+/** Narrow a list of statuses to the recognised ClientStatus enum values. */
+function normaliseStatusFilter(values: ClientStatus[] | undefined): ClientStatus[] | null {
+  if (!values || values.length === 0) return null;
+  const valid = new Set(Object.values(ClientStatus) as string[]);
+  const filtered = values.filter((v) => valid.has(v));
+  return filtered.length > 0 ? filtered : null;
 }
 
 /**
@@ -327,8 +338,12 @@ export async function sendBulkMessages(input: BulkSendInput): Promise<ActionResu
 
     const clientIds =
       input.audience.mode === "selected" ? input.audience.clientIds : undefined;
+    const statusFilter = normaliseStatusFilter(input.statusFilter);
+    const where: Prisma.ClientWhereInput = {};
+    if (clientIds) where.id = { in: clientIds };
+    if (statusFilter) where.status = { in: statusFilter };
     const clients = await prisma.client.findMany({
-      where: clientIds ? { id: { in: clientIds } } : undefined,
+      where: clientIds || statusFilter ? where : undefined,
       orderBy: { name: "asc" },
       include: {
         vehicles: { take: 1, orderBy: { updatedAt: "desc" } },

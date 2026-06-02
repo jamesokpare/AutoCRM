@@ -6,7 +6,12 @@
  * runtime into their bundles.
  */
 
-import type { BulkRecipientState, Channel, EmailProvider } from "@crm-tool/db/enums";
+import type {
+  BulkRecipientState,
+  Channel,
+  ClientStatus,
+  EmailProvider,
+} from "@crm-tool/db/enums";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -71,6 +76,9 @@ export interface BulkSendInput {
    *  `{{whatsapp}}`, `{{vehicle}}` placeholders. */
   content: string;
   audience: BulkAudience;
+  /** Optional client-status whitelist applied after the audience is resolved.
+   *  Empty / undefined means no filter. */
+  statusFilter?: ClientStatus[];
   /** Send a single test message to this destination only — does not record a campaign. */
   testDestination?: string;
 }
@@ -100,4 +108,5 @@ export interface BulkClientOption {
   email: string | null;
   phone: string | null;
   whatsapp: string | null;
+  status: ClientStatus;
 }

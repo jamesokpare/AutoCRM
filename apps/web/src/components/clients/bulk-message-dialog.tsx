@@ -1,6 +1,6 @@
 "use client";
 
-import { Channel } from "@crm-tool/db/enums";
+import { Channel, ClientStatus } from "@crm-tool/db/enums";
 import { Badge } from "@crm-tool/ui/components/badge";
 import { Button } from "@crm-tool/ui/components/button";
 import { Checkbox } from "@crm-tool/ui/components/checkbox";
@@ -32,9 +32,18 @@ import type {
   BulkSendResult,
 } from "@/lib/actions/messaging-types";
 
+import { ClientStatusBadge } from "./status-badge";
+
 const CHANNEL_OPTIONS = [
   { value: Channel.WHATSAPP, label: "WhatsApp" },
   { value: Channel.EMAIL, label: "Email" },
+];
+
+const STATUS_FILTER_OPTIONS: { value: ClientStatus; label: string }[] = [
+  { value: ClientStatus.PROSPECT, label: "Prospect" },
+  { value: ClientStatus.ACTIVE, label: "Active" },
+  { value: ClientStatus.INACTIVE, label: "Inactive" },
+  { value: ClientStatus.ARCHIVED, label: "Archived" },
 ];
 
 const SAMPLE_TEMPLATES = {
@@ -46,18 +55,58 @@ Thanks for trusting Drivewell with your {{vehicle}}. We wanted to let you know a
 — The Drivewell team`,
 };
 
-export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) {
-  const [open, setOpen] = useState(false);
+export function BulkMessageDialog({
+  trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  initialClientIds,
+  onSent,
+}: {
+  trigger?: React.ReactElement;
+  /** Controlled-open prop. Omit to let the dialog manage its own open state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** When provided, the dialog opens with audience = "selected" and these IDs ticked. */
+  initialClientIds?: string[];
+  /** Called once after a successful send (useful for clearing parent selection). */
+  onSent?: () => void;
+}) {
+  const isControlled = openProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? openProp : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChangeProp?.(next);
+  };
+
   const [tab, setTab] = useState<"recipients" | "compose">("recipients");
   const [channel, setChannel] = useState<Channel>(Channel.WHATSAPP);
-  const [audience, setAudience] = useState<"all" | "selected">("all");
+  const [audience, setAudience] = useState<"all" | "selected">(
+    initialClientIds && initialClientIds.length > 0 ? "selected" : "all",
+  );
   const [clients, setClients] = useState<BulkClientOption[] | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    new Set(initialClientIds ?? []),
+  );
+  const [statusFilter, setStatusFilter] = useState<Set<ClientStatus>>(new Set());
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState(SAMPLE_TEMPLATES.WHATSAPP);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<BulkSendResult | null>(null);
+
+  // Re-seed the selection / audience whenever the parent's initialClientIds
+  // change between opens (e.g. the user picks a different row set in the table).
+  useEffect(() => {
+    if (!open) return;
+    if (initialClientIds && initialClientIds.length > 0) {
+      setSelectedIds(new Set(initialClientIds));
+      setAudience("selected");
+    }
+    // Intentionally not depending on initialClientIds identity — we only want
+    // to reseed when the dialog (re)opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     if (!open || clients) return;
@@ -81,36 +130,57 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
     }
   }, [channel, content]);
 
+  // Apply the status filter first — it constrains BOTH the "All" audience and
+  // the recipient picker, so an unticked client cannot leak in via the audience
+  // switch.
+  const statusFiltered = useMemo(() => {
+    if (!clients) return [] as BulkClientOption[];
+    if (statusFilter.size === 0) return clients;
+    return clients.filter((c) => statusFilter.has(c.status));
+  }, [clients, statusFilter]);
+
   const filtered = useMemo(() => {
-    if (!clients) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter(
+    if (!q) return statusFiltered;
+    return statusFiltered.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         (c.email ?? "").toLowerCase().includes(q) ||
         (c.phone ?? "").includes(q) ||
         (c.whatsapp ?? "").includes(q),
     );
-  }, [clients, search]);
+  }, [statusFiltered, search]);
 
-  const reachable = useMemo(() => {
-    if (!clients) return 0;
-    const universe = audience === "all"
-      ? clients
-      : clients.filter((c) => selectedIds.has(c.id));
-    return universe.filter((c) =>
-      channel === Channel.WHATSAPP ? Boolean(c.whatsapp || c.phone) : Boolean(c.email),
-    ).length;
-  }, [clients, audience, selectedIds, channel]);
+  // Universe = the pool of clients the send will hit AFTER status filtering.
+  const universe = useMemo(() => {
+    if (audience === "all") return statusFiltered;
+    return statusFiltered.filter((c) => selectedIds.has(c.id));
+  }, [statusFiltered, audience, selectedIds]);
 
-  const totalSelected = audience === "all" ? clients?.length ?? 0 : selectedIds.size;
+  const reachable = useMemo(
+    () =>
+      universe.filter((c) =>
+        channel === Channel.WHATSAPP ? Boolean(c.whatsapp || c.phone) : Boolean(c.email),
+      ).length,
+    [universe, channel],
+  );
+
+  const totalSelected = universe.length;
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleStatus = (s: ClientStatus) => {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
       return next;
     });
   };
@@ -137,12 +207,14 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
           audience === "all"
             ? { mode: "all" }
             : { mode: "selected", clientIds: Array.from(selectedIds) },
+        statusFilter: statusFilter.size > 0 ? Array.from(statusFilter) : undefined,
       });
       if (!res.ok) {
         toast.error(res.error ?? "Send failed.");
         return;
       }
       setResult(res.data!);
+      onSent?.();
       toast.success(
         `Sent ${res.data!.sent} · failed ${res.data!.failed} · skipped ${res.data!.skipped}`,
       );
@@ -152,12 +224,18 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
   const reset = () => {
     setResult(null);
     setSelectedIds(new Set());
+    setStatusFilter(new Set());
     setSearch("");
     setSubject("");
     setAudience("all");
     setTab("recipients");
     setContent(channel === Channel.EMAIL ? SAMPLE_TEMPLATES.EMAIL : SAMPLE_TEMPLATES.WHATSAPP);
   };
+
+  const audienceCountLabel =
+    statusFilter.size > 0
+      ? `Filtered ${statusFiltered.length}/${clients?.length ?? 0}`
+      : `All clients (${clients?.length ?? "…"})`;
 
   return (
     <Dialog
@@ -167,7 +245,7 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
         if (!o) reset();
       }}
     >
-      <DialogTrigger render={trigger} />
+      {trigger ? <DialogTrigger render={trigger} /> : null}
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Bulk message clients</DialogTitle>
@@ -206,7 +284,7 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
                     onClick={() => setAudience("all")}
                     type="button"
                   >
-                    All clients ({clients?.length ?? "…"})
+                    {audienceCountLabel}
                   </Button>
                   <Button
                     size="xs"
@@ -218,6 +296,40 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
                   </Button>
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Filter by client status</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_FILTER_OPTIONS.map((opt) => (
+                  <Button
+                    key={opt.value}
+                    size="xs"
+                    variant={statusFilter.has(opt.value) ? "default" : "outline"}
+                    onClick={() => toggleStatus(opt.value)}
+                    type="button"
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+                {statusFilter.size > 0 && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setStatusFilter(new Set())}
+                    type="button"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {statusFilter.size === 0
+                  ? "Sending to clients of any status."
+                  : `Only sending to clients whose status is ${Array.from(statusFilter)
+                      .map((s) => STATUS_FILTER_OPTIONS.find((o) => o.value === s)?.label ?? s)
+                      .join(", ")}.`}
+              </p>
             </div>
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as "recipients" | "compose")}>
@@ -257,6 +369,7 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
                                 }}
                               />
                               <span className="flex-1 truncate">{c.name}</span>
+                              <ClientStatusBadge status={c.status} />
                               <span
                                 className={
                                   dest
@@ -274,8 +387,8 @@ export function BulkMessageDialog({ trigger }: { trigger: React.ReactElement }) 
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {audience === "all"
-                      ? `Will send to ${reachable} of ${clients?.length ?? 0} clients (others lack a ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address).`
-                      : `${reachable} of ${selectedIds.size} selected clients have a usable ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address.`}
+                      ? `Will send to ${reachable} of ${universe.length} clients (others lack a ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address).`
+                      : `${reachable} of ${universe.length} selected clients have a usable ${channel === Channel.WHATSAPP ? "WhatsApp/phone" : "email"} address${statusFilter.size > 0 ? " and match the status filter" : ""}.`}
                   </p>
                 </div>
               </TabsPanel>
