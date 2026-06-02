@@ -150,6 +150,10 @@ export function ClientIntakeForm({
               <Textarea id="description" name="description" rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <Field label="Item / Part Requested" name="itemRequested" />
+              <Field label="Order ID" name="externalOrderId" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <Label htmlFor="status">Status</Label>
                 <select
