@@ -118,7 +118,7 @@ const clientListSelect = {
   serviceStatus: true,
   updatedAt: true,
   vehicles: {
-    select: { id: true, make: true, model: true, year: true },
+    select: { id: true, make: true, model: true, year: true, vin: true },
     orderBy: { createdAt: "asc" },
   },
   orders: {
@@ -129,8 +129,10 @@ const clientListSelect = {
       expectedDate: true,
       updatedAt: true,
       assignedTechName: true,
+      externalOrderId: true,
+      itemRequested: true,
       assignedTech: { select: { id: true, name: true } },
-      vehicle: { select: { make: true, model: true, year: true } },
+      vehicle: { select: { make: true, model: true, year: true, vin: true } },
       parts: { select: { availability: true } },
     },
     orderBy: { updatedAt: "desc" },
