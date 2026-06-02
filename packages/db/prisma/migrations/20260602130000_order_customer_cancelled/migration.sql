@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "OrderStatus" ADD VALUE 'CUSTOMER_CANCELLED';
+
+-- AlterEnum
+ALTER TYPE "ServiceStatus" ADD VALUE 'CUSTOMER_CANCELLED';

@@ -42,6 +42,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   COMPLETED: "Completed",
   FAILED: "Failed",
   ON_HOLD: "On Hold",
+  CUSTOMER_CANCELLED: "Customer cancelled",
 };
 
 // "All statuses" clears the order-status filter (the dropdown can't be left

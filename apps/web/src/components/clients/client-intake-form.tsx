@@ -26,6 +26,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   COMPLETED: "Completed",
   FAILED: "Failed",
   ON_HOLD: "On Hold",
+  CUSTOMER_CANCELLED: "Customer cancelled",
 };
 
 const PART_LABEL: Record<PartAvailability, string> = {
