@@ -49,6 +49,7 @@ const ORDER_TO_SERVICE: Record<OrderStatus, ServiceStatus> = {
   COMPLETED: ServiceStatus.COMPLETED,
   FAILED: ServiceStatus.FAILED,
   ON_HOLD: ServiceStatus.ON_HOLD,
+  CUSTOMER_CANCELLED: ServiceStatus.CUSTOMER_CANCELLED,
 };
 
 /**

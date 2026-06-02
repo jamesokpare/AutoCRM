@@ -39,6 +39,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   COMPLETED: "Completed",
   FAILED: "Failed",
   ON_HOLD: "On Hold",
+  CUSTOMER_CANCELLED: "Customer cancelled",
 };
 
 const REQUIRES_REASON: OrderStatus[] = [OrderStatus.FAILED, OrderStatus.ON_HOLD];

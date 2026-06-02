@@ -26,6 +26,7 @@ enum OrderStatus {
   COMPLETED
   FAILED
   ON_HOLD
+  CUSTOMER_CANCELLED
 }
 
 enum ClientStatus {
@@ -47,6 +48,7 @@ enum ServiceStatus {
   ON_HOLD
   DUE_TODAY
   PARTS_NOT_AVAILABLE
+  CUSTOMER_CANCELLED
 }
 
 enum PartAvailability {

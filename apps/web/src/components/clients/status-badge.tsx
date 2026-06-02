@@ -15,6 +15,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   COMPLETED: "Completed",
   FAILED: "Failed",
   ON_HOLD: "On Hold",
+  CUSTOMER_CANCELLED: "Customer cancelled",
 };
 
 const STATUS_CLASS: Record<OrderStatus, string> = {
@@ -23,6 +24,7 @@ const STATUS_CLASS: Record<OrderStatus, string> = {
   COMPLETED: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   FAILED: "border-transparent bg-red-500/15 text-red-700 dark:text-red-400",
   ON_HOLD: "border-transparent bg-muted text-muted-foreground",
+  CUSTOMER_CANCELLED: "border-transparent bg-muted text-muted-foreground",
 };
 
 export function StatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
@@ -41,7 +43,11 @@ export function StatusBadge({ status, className }: { status: OrderStatus; classN
 
 // A "due today" nudge only makes sense while the job is still open — a
 // completed or failed order is no longer waiting on anyone.
-const DUE_TODAY_IRRELEVANT: OrderStatus[] = [OrderStatus.COMPLETED, OrderStatus.FAILED];
+const DUE_TODAY_IRRELEVANT: OrderStatus[] = [
+  OrderStatus.COMPLETED,
+  OrderStatus.FAILED,
+  OrderStatus.CUSTOMER_CANCELLED,
+];
 
 /**
  * "Due today" indicator for an order. Renders only when the order's expected
@@ -127,6 +133,7 @@ const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
   ON_HOLD: "On Hold",
   DUE_TODAY: "Due today",
   PARTS_NOT_AVAILABLE: "Parts not available",
+  CUSTOMER_CANCELLED: "Customer cancelled",
 };
 
 const SERVICE_STATUS_CLASS: Record<ServiceStatus, string> = {
@@ -137,6 +144,7 @@ const SERVICE_STATUS_CLASS: Record<ServiceStatus, string> = {
   ON_HOLD: "border-transparent bg-muted text-muted-foreground",
   DUE_TODAY: "border-transparent bg-orange-500/15 text-orange-700 dark:text-orange-400",
   PARTS_NOT_AVAILABLE: "border-transparent bg-red-500/15 text-red-700 dark:text-red-400",
+  CUSTOMER_CANCELLED: "border-transparent bg-muted text-muted-foreground",
 };
 
 /** Manually-set client service status badge (CLT). */
