@@ -180,7 +180,7 @@ export async function getClientList(filters: ClientListFilters = {}): Promise<Cl
   return prisma.client.findMany({
     where,
     select: clientListSelect,
-    orderBy: { updatedAt: "desc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 
