@@ -169,6 +169,61 @@ function channelFromCell(value: string | null | undefined): Channel | null {
   return (Object.values(Channel) as string[]).includes(v) ? (v as Channel) : null;
 }
 
+/** Parse an order status from an import cell — accepts "In Progress", "in_progress", etc. */
+function orderStatusFromCell(value: string | null | undefined): OrderStatus | null {
+  const v = value?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (!v) return null;
+  return (Object.values(OrderStatus) as string[]).includes(v) ? (v as OrderStatus) : null;
+}
+
+/** Parse a year cell to an Int, accepting numeric strings or 4-digit years embedded with junk. */
+function yearFromCell(value: string | null | undefined): number | null {
+  const v = value?.trim();
+  if (!v) return null;
+  const m = v.match(/\b(19|20)\d{2}\b/);
+  if (!m) return null;
+  const n = Number.parseInt(m[0], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Resolve make / model / year from a row. Prefers explicit `make`/`model`/`year`
+ * fields when given; otherwise splits a combined "Make & Model" cell on the
+ * first whitespace and tries to pull a 4-digit year out of it.
+ */
+function resolveVehicle(row: {
+  make?: string | null;
+  model?: string | null;
+  year?: string | null;
+  vehicleMakeModel?: string | null;
+}): { make: string | null; model: string | null; year: number | null } {
+  const explicitMake = cleanCell(row.make);
+  const explicitModel = cleanCell(row.model);
+  const explicitYear = yearFromCell(row.year);
+
+  let make = explicitMake;
+  let model = explicitModel;
+  let year = explicitYear;
+
+  const combined = cleanCell(row.vehicleMakeModel);
+  if (combined) {
+    if (year === null) year = yearFromCell(combined);
+    if (!make || !model) {
+      // Strip an embedded year before splitting so it doesn't end up as make/model.
+      const stripped = combined.replace(/\b(19|20)\d{2}\b/, "").replace(/\s+/g, " ").trim();
+      const m = stripped.match(/^(\S+)\s+(.+)$/);
+      if (m) {
+        if (!make) make = m[1];
+        if (!model) model = m[2];
+      } else if (!make && stripped) {
+        make = stripped;
+      }
+    }
+  }
+
+  return { make, model, year };
+}
+
 /** Hard cap so a single import can't run away with the request. */
 const MAX_IMPORT_ROWS = 1000;
 
@@ -194,18 +249,24 @@ export async function importClients(
 
     let created = 0;
     let skipped = 0;
+    let vehiclesCreated = 0;
+    let ordersCreated = 0;
     const errors: string[] = [];
+    const pushErr = (msg: string) => {
+      if (errors.length < 50) errors.push(msg);
+    };
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const name = cleanCell(row?.name);
       if (!name) {
         skipped++;
-        if (errors.length < 50) errors.push(`Row ${i + 1}: missing name — skipped.`);
+        pushErr(`Row ${i + 1}: missing name — skipped.`);
         continue;
       }
+      let clientId: string;
       try {
-        await withMutation(
+        const c = await withMutation(
           {
             entityType: "Client",
             action: "created",
@@ -225,16 +286,86 @@ export async function importClients(
             }),
           (c) => c.id,
         );
+        clientId = c.id;
         created++;
       } catch {
         skipped++;
-        if (errors.length < 50) errors.push(`Row ${i + 1} (${name}): failed to create.`);
+        pushErr(`Row ${i + 1} (${name}): failed to create.`);
+        continue;
+      }
+
+      const { make, model, year } = resolveVehicle(row);
+      const vin = cleanCell(row.vin);
+      const hasVehicleHint = Boolean(make ?? model ?? year ?? vin ?? row.vehicleMakeModel);
+      if (!hasVehicleHint) continue;
+      if (!make || !model || year === null) {
+        pushErr(`Row ${i + 1} (${name}): vehicle skipped — need make, model, and a 4-digit year.`);
+        continue;
+      }
+
+      let vehicleId: string;
+      try {
+        const v = await withMutation(
+          {
+            entityType: "Vehicle",
+            action: "created",
+            userId: user.id,
+            metadata: { clientId, make, model, year, source: "import" },
+          },
+          async () =>
+            prisma.vehicle.create({
+              data: { clientId, make, model, year, vin },
+            }),
+          (v) => v.id,
+        );
+        vehicleId = v.id;
+        vehiclesCreated++;
+      } catch {
+        pushErr(`Row ${i + 1} (${name}): vehicle failed to create.`);
+        continue;
+      }
+
+      const description = cleanCell(row.description);
+      const itemRequested = cleanCell(row.itemRequested);
+      const externalOrderId = cleanCell(row.externalOrderId);
+      const status = orderStatusFromCell(row.orderStatus);
+      const hasOrderHint = Boolean(description ?? itemRequested ?? externalOrderId ?? status);
+      if (!hasOrderHint) continue;
+      if (!description) {
+        pushErr(`Row ${i + 1} (${name}): order skipped — needs an Issue Description.`);
+        continue;
+      }
+
+      try {
+        await withMutation(
+          {
+            entityType: "Order",
+            action: "created",
+            userId: user.id,
+            metadata: { clientId, vehicleId, status: status ?? OrderStatus.PENDING, source: "import" },
+          },
+          async () =>
+            prisma.order.create({
+              data: {
+                clientId,
+                vehicleId,
+                description,
+                status: status ?? OrderStatus.PENDING,
+                itemRequested,
+                externalOrderId,
+              },
+            }),
+          (o) => o.id,
+        );
+        ordersCreated++;
+      } catch {
+        pushErr(`Row ${i + 1} (${name}): order failed to create.`);
       }
     }
 
     revalidatePath("/clients");
     revalidatePath("/dashboard");
-    return { ok: true, data: { created, skipped, errors } };
+    return { ok: true, data: { created, skipped, vehiclesCreated, ordersCreated, errors } };
   } catch (err) {
     return fail(err);
   }
