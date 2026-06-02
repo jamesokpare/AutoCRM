@@ -148,10 +148,14 @@ export function ClientTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Client</TableHead>
-              <TableHead>Client status</TableHead>
+              <TableHead>Customer Name</TableHead>
+              <TableHead>Phone / Email</TableHead>
+              <TableHead>Client Status</TableHead>
               <TableHead>Vehicle</TableHead>
-              <TableHead>Order</TableHead>
+              <TableHead>VIN</TableHead>
+              <TableHead>Order ID</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Item / Part Requested</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Parts</TableHead>
               <TableHead>Expected</TableHead>
@@ -163,7 +167,7 @@ export function ClientTable({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
+                <TableCell colSpan={14} className="text-center text-muted-foreground">
                   No clients match these filters.
                 </TableCell>
               </TableRow>
@@ -177,20 +181,33 @@ export function ClientTable({
                       <Link href={`/clients/${client.id}`} className="hover:underline">
                         {client.name}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {client.phone ?? client.email ?? ""}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-xs">
+                        {client.phone ? <span>{client.phone}</span> : null}
+                        {client.email ? <span className="text-muted-foreground">{client.email}</span> : null}
+                        {!client.phone && !client.email ? <span className="text-muted-foreground">—</span> : null}
                       </div>
                     </TableCell>
                     <TableCell>
                       <ClientStatusBadge status={client.status} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {vehicle
-                        ? `${vehicle.make} ${vehicle.model}${"year" in vehicle ? ` (${vehicle.year})` : ""}`
+                        ? `${vehicle.make} ${vehicle.model}${vehicle.year ? ` (${vehicle.year})` : ""}`
                         : "—"}
                     </TableCell>
-                    <TableCell className="max-w-[16rem] truncate">
-                      {order ? order.description : <span className="text-muted-foreground">No orders</span>}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {vehicle?.vin ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {order?.externalOrderId ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[14rem] truncate text-xs">
+                      {order?.description ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {order?.itemRequested ?? "—"}
                     </TableCell>
                     <TableCell>
                       {client.serviceStatus || order ? (
@@ -207,11 +224,11 @@ export function ClientTable({
                     <TableCell>
                       {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
                     </TableCell>
-                    <TableCell>{fmtDate(order?.expectedDate ?? null)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{fmtDate(order?.expectedDate ?? null)}</TableCell>
                     <TableCell>
                       {order?.assignedTechName ?? order?.assignedTech?.name ?? "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
                       {fmtDate(order?.updatedAt ?? client.updatedAt)}
                     </TableCell>
                     <TableCell className="text-right">
