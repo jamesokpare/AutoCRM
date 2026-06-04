@@ -43,6 +43,7 @@ model User {
   kpiVotes        KpiVote[]           @relation("KpiVoteCaster")
   bulkMessages    BulkMessage[]       @relation("BulkMessageSender")
   messagingSettingsUpdates MessagingSettings[] @relation("MessagingSettingsUpdatedBy")
+  orderCompletionReminders OrderCompletionReminder[] @relation("OrderCompletionReminderUser")
 
   @@unique([email])
   @@map("user")

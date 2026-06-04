@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @crm-tool/db db:migrate:deploy && next build"
+  "buildCommand": "pnpm --filter @crm-tool/db db:migrate:deploy && next build",
+  "crons": [
+    {
+      "path": "/api/cron/expected-date-reminders",
+      "schedule": "0 7 * * *"
+    }
+  ]
 }
