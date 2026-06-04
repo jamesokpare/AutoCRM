@@ -33,19 +33,21 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   /** Only show to ADMIN. */
   adminOnly?: boolean;
+  /** Which sidebar count drives the trailing badge (if any). */
+  badge?: "notifications" | "tasks";
 }
 
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Briefcase },
-  { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/tasks", label: "Tasks", icon: ListChecks, badge: "tasks" },
   { href: "/team", label: "Team", icon: Users },
   { href: "/reviews", label: "Reviews", icon: ClipboardList },
   { href: "/kpi", label: "KPI Board", icon: Gauge },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/reminders", label: "Reminders", icon: Star },
   { href: "/attendance", label: "Attendance", icon: Clock },
-  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/notifications", label: "Notifications", icon: Bell, badge: "notifications" },
   { href: "/admin/users", label: "User Admin", icon: Shield, adminOnly: true },
   { href: "/admin/messaging", label: "Messaging", icon: MessageSquare, adminOnly: true },
   { href: "/profile", label: "Profile", icon: Users },
@@ -57,7 +59,35 @@ interface SidebarUser {
   roles: Role[];
 }
 
-function NavLinks({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => void }) {
+export interface SidebarCounts {
+  /** Unread Notification rows for the current user. */
+  notifications: number;
+  /** Open (PENDING / IN_PROGRESS) Task rows assigned to the current user. */
+  tasks: number;
+}
+
+function NavBadge({ value }: { value: number }) {
+  // Clamp very large counts to keep the badge inside the nav row.
+  const label = value > 99 ? "99+" : String(value);
+  return (
+    <span
+      aria-label={`${value} ${value === 1 ? "item" : "items"}`}
+      className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-none text-primary-foreground tabular-nums"
+    >
+      {label}
+    </span>
+  );
+}
+
+function NavLinks({
+  user,
+  counts,
+  onNavigate,
+}: {
+  user: SidebarUser;
+  counts: SidebarCounts;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const isAdmin = user.roles.includes("ADMIN" as Role);
 
@@ -66,6 +96,7 @@ function NavLinks({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => 
       {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
         const Icon = item.icon;
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const badgeValue = item.badge ? counts[item.badge] : 0;
         return (
           <Link
             key={item.href}
@@ -79,6 +110,7 @@ function NavLinks({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => 
           >
             <Icon className="size-4" />
             {item.label}
+            {item.badge && badgeValue > 0 ? <NavBadge value={badgeValue} /> : null}
           </Link>
         );
       })}
@@ -86,7 +118,15 @@ function NavLinks({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => 
   );
 }
 
-function SidebarInner({ user, onNavigate }: { user: SidebarUser; onNavigate?: () => void }) {
+function SidebarInner({
+  user,
+  counts,
+  onNavigate,
+}: {
+  user: SidebarUser;
+  counts: SidebarCounts;
+  onNavigate?: () => void;
+}) {
   const router = useRouter();
 
   return (
@@ -100,7 +140,7 @@ function SidebarInner({ user, onNavigate }: { user: SidebarUser; onNavigate?: ()
       </div>
       <Separator />
       <div className="flex-1 overflow-y-auto py-2">
-        <NavLinks user={user} onNavigate={onNavigate} />
+        <NavLinks user={user} counts={counts} onNavigate={onNavigate} />
       </div>
       <Separator />
       <div className="p-2">
@@ -120,12 +160,18 @@ function SidebarInner({ user, onNavigate }: { user: SidebarUser; onNavigate?: ()
   );
 }
 
-export function DashboardSidebar({ user }: { user: SidebarUser }) {
+export function DashboardSidebar({
+  user,
+  counts,
+}: {
+  user: SidebarUser;
+  counts: SidebarCounts;
+}) {
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="hidden border-r bg-card md:block">
-        <SidebarInner user={user} />
+        <SidebarInner user={user} counts={counts} />
       </aside>
 
       {/* Mobile top bar + sheet */}
@@ -145,7 +191,7 @@ export function DashboardSidebar({ user }: { user: SidebarUser }) {
           />
           <SheetContent side="left" className="w-64 p-0">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SidebarInner user={user} />
+            <SidebarInner user={user} counts={counts} />
           </SheetContent>
         </Sheet>
       </div>
