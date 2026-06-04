@@ -241,11 +241,32 @@ model Order {
   feedback      Feedback[]
   communications Communication[]
   reminders     Reminder[]
+  completionReminders OrderCompletionReminder[]
 
   @@index([clientId])
   @@index([vehicleId])
   @@index([assignedTechId])
   @@index([status])
+}
+
+// Idempotency log for the daily "expected completion date" reminder cron.
+// One row per (order, daysBefore, expectedDate, recipient) — re-running the
+// cron is a no-op, and pushing the expectedDate out generates a fresh row so
+// the new schedule's reminders fire too.
+model OrderCompletionReminder {
+  id           String   @id @default(cuid())
+  orderId      String
+  daysBefore   Int
+  expectedDate DateTime
+  userId       String
+  sentAt       DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation("OrderCompletionReminderUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, daysBefore, expectedDate, userId])
+  @@index([orderId])
+  @@index([userId])
 }
 
 model Part {
