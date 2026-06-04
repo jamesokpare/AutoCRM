@@ -168,6 +168,29 @@ export function ServiceStatusBadge({
   );
 }
 
+/**
+ * Free-text service status badge — rendered when a client has a custom
+ * `serviceStatusCustom` set. Neutral colour since the text is arbitrary.
+ */
+export function CustomServiceStatusBadge({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit shrink-0 items-center rounded-none border-transparent bg-purple-500/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-400",
+        className,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 /** Aggregate parts availability for an order's whole parts list (DASH column). */
 export function OrderPartsBadge({ parts }: { parts: { availability: PartAvailability }[] }) {
   if (parts.length === 0) {

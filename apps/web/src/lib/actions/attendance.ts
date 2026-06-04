@@ -13,7 +13,11 @@ import {
   getMyOpenAttendance,
   getTodayAttendance,
 } from "@/lib/queries/attendance";
-import { getTodayTaskSummary, type TodayTaskSummary } from "@/lib/queries/tasks";
+import {
+  getTodayTaskList,
+  getTodayTaskSummary,
+  type TodayTaskSummary,
+} from "@/lib/queries/tasks";
 import { PermissionError, requireAuth } from "@/lib/rbac";
 import type { ActionResult } from "./attendance-types";
 
@@ -87,7 +91,10 @@ export async function clockIn(): Promise<ActionResult> {
       (a) => a.id,
     );
 
-    const summary = await getTodayTaskSummary(user.id);
+    const [summary, tasks] = await Promise.all([
+      getTodayTaskSummary(user.id),
+      getTodayTaskList(user.id),
+    ]);
     const reminder = clockInReminder(summary);
     await createNotification({
       userId: user.id,
@@ -98,7 +105,7 @@ export async function clockIn(): Promise<ActionResult> {
     });
 
     revalidatePath("/attendance");
-    return { ok: true, taskSummary: summary, reminder };
+    return { ok: true, taskSummary: summary, tasks, reminder };
   } catch (err) {
     return fail(err);
   }
@@ -117,7 +124,10 @@ export async function clockOut(): Promise<ActionResult> {
       async () => prisma.attendance.update({ where: { id: open.id }, data: { clockOut: new Date() } }),
     );
 
-    const summary = await getTodayTaskSummary(user.id);
+    const [summary, tasks] = await Promise.all([
+      getTodayTaskSummary(user.id),
+      getTodayTaskList(user.id),
+    ]);
     const reminder = clockOutReminder(summary);
     await createNotification({
       userId: user.id,
@@ -128,7 +138,7 @@ export async function clockOut(): Promise<ActionResult> {
     });
 
     revalidatePath("/attendance");
-    return { ok: true, taskSummary: summary, reminder };
+    return { ok: true, taskSummary: summary, tasks, reminder };
   } catch (err) {
     return fail(err);
   }

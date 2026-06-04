@@ -116,6 +116,7 @@ const clientListSelect = {
   email: true,
   status: true,
   serviceStatus: true,
+  serviceStatusCustom: true,
   createdAt: true,
   updatedAt: true,
   vehicles: {

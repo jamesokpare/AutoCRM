@@ -9,6 +9,7 @@ import { ApologyDialog } from "@/components/clients/apology-dialog";
 import {
   ClientDeleteButton,
   ClientServiceStatusControl,
+  ClientServiceStatusCustomControl,
   ClientStatusControl,
 } from "@/components/clients/client-actions";
 import { ClientForm } from "@/components/clients/client-form";
@@ -18,6 +19,7 @@ import { AddPart, PartControl, StatusControl } from "@/components/clients/order-
 import { OrderForm } from "@/components/clients/order-form";
 import {
   ClientStatusBadge,
+  CustomServiceStatusBadge,
   DueTodayBadge,
   PartAvailabilityBadge,
   StatusBadge,
@@ -87,6 +89,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">{client.name}</h1>
             <ClientStatusBadge status={client.status} />
+            {client.serviceStatusCustom ? (
+              <CustomServiceStatusBadge label={client.serviceStatusCustom} />
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             {[client.phone, client.email, client.whatsapp].filter(Boolean).join(" · ") || "No contact details"}
@@ -101,6 +106,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           ) : null}
           {canEdit ? (
             <ClientServiceStatusControl clientId={client.id} current={client.serviceStatus} />
+          ) : null}
+          {canEdit ? (
+            <ClientServiceStatusCustomControl
+              clientId={client.id}
+              current={client.serviceStatusCustom}
+            />
           ) : null}
           <FeedbackForm
             clientId={client.id}
