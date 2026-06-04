@@ -309,11 +309,11 @@ export function ClientTable({
               <TableHead>Phone / Email</TableHead>
               <TableHead>Client Status</TableHead>
               <TableHead>Vehicle</TableHead>
-              <TableHead>VIN</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Order ID</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Item / Part Requested</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>VIN</TableHead>
               <TableHead>Parts</TableHead>
               <TableHead>Expected</TableHead>
               <TableHead>Tech</TableHead>
@@ -375,18 +375,6 @@ export function ClientTable({
                         ? `${vehicle.make} ${vehicle.model}${vehicle.year ? ` (${vehicle.year})` : ""}`
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {vehicle?.vin ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order?.externalOrderId ?? "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[14rem] truncate text-xs">
-                      {order?.description ?? <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order?.itemRequested ?? "—"}
-                    </TableCell>
                     <TableCell>
                       {client.serviceStatusCustom || client.serviceStatus || order ? (
                         <div className="flex flex-col gap-1">
@@ -401,6 +389,18 @@ export function ClientTable({
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {order?.externalOrderId ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[14rem] truncate text-xs">
+                      {order?.description ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {order?.itemRequested ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {vehicle?.vin ?? "—"}
                     </TableCell>
                     <TableCell>
                       {order ? <OrderPartsBadge parts={order.parts} /> : "—"}
