@@ -2,14 +2,25 @@
 
 import { Button } from "@crm-tool/ui/components/button";
 import { Card } from "@crm-tool/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@crm-tool/ui/components/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { LogIn, LogOut } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { clockIn, clockOut, fetchTodayAttendance } from "@/lib/actions/attendance";
+import type { ActionResult } from "@/lib/actions/attendance-types";
 import type { AttendanceRow } from "@/lib/queries/attendance";
 import { formatWatDate } from "@/components/ops/wat";
+import { PriorityBadge, StatusBadge } from "@/components/team/task-badges";
+import type { TodayTaskBrief } from "@/lib/queries/tasks";
 
 function fmtTime(d: Date | string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -18,6 +29,20 @@ function fmtTime(d: Date | string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(d));
+}
+
+function fmtTaskDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(iso));
+}
+
+interface TaskDialogState {
+  mode: "in" | "out";
+  tasks: TodayTaskBrief[];
+  reminder: string | null;
 }
 
 export function AttendancePanel({
@@ -42,6 +67,7 @@ export function AttendancePanel({
 
   const [pending, startTransition] = useTransition();
   const [myOpen, setMyOpen] = useState(initiallyClockedIn);
+  const [taskDialog, setTaskDialog] = useState<TaskDialogState | null>(null);
 
   // Keep myOpen in sync with refetched rows for the current user. A shift that
   // started on a previous WAT day won't appear in today's rows, so only flip
@@ -52,22 +78,25 @@ export function AttendancePanel({
     setMyOpen(mine.some((r) => r.clockOut === null));
   }, [rows, currentUserId]);
 
-  function act(fn: typeof clockIn, label: string, nextOpen: boolean) {
+  function act(
+    fn: () => Promise<ActionResult>,
+    label: string,
+    nextOpen: boolean,
+    mode: "in" | "out",
+  ) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
         toast.error(res.error ?? "Something went wrong.");
         return;
       }
-      // Surface the task-reminder message returned by the action so the user
-      // sees it the moment they clock in / out. A matching Notification row is
-      // also written server-side for the notification centre.
-      if (res.reminder) {
-        toast.success(label, { description: res.reminder, duration: 8000 });
-      } else {
-        toast.success(label);
-      }
+      toast.success(label);
       setMyOpen(nextOpen);
+      setTaskDialog({
+        mode,
+        tasks: res.tasks ?? [],
+        reminder: res.reminder ?? null,
+      });
       refetch();
     });
   }
@@ -86,7 +115,7 @@ export function AttendancePanel({
           <Button
             size="sm"
             disabled={pending || myOpen || !!loadError}
-            onClick={() => act(clockIn, "Clocked in", true)}
+            onClick={() => act(clockIn, "Clocked in", true, "in")}
           >
             <LogIn className="size-4" /> Clock in
           </Button>
@@ -94,7 +123,7 @@ export function AttendancePanel({
             size="sm"
             variant="outline"
             disabled={pending || !myOpen || !!loadError}
-            onClick={() => act(clockOut, "Clocked out", false)}
+            onClick={() => act(clockOut, "Clocked out", false, "out")}
           >
             <LogOut className="size-4" /> Clock out
           </Button>
@@ -136,6 +165,80 @@ export function AttendancePanel({
           </div>
         )}
       </section>
+
+      <TaskDialog state={taskDialog} onClose={() => setTaskDialog(null)} />
     </div>
+  );
+}
+
+function TaskDialog({
+  state,
+  onClose,
+}: {
+  state: TaskDialogState | null;
+  onClose: () => void;
+}) {
+  const open = state !== null;
+  const title = state?.mode === "in" ? "Your tasks for today" : "Tasks at clock-out";
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        {state?.reminder ? (
+          <p className="text-sm text-muted-foreground">{state.reminder}</p>
+        ) : null}
+
+        {state && state.tasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No tasks tracked for today. Head to the Tasks board if you need to plan your day.
+          </p>
+        ) : null}
+
+        {state && state.tasks.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {state.tasks.map((t) => (
+              <li key={t.id}>
+                <Card className="gap-2 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{t.title}</p>
+                      {t.description ? (
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                          {t.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-1">
+                      <StatusBadge status={t.status} />
+                      <PriorityBadge priority={t.priority} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {t.carriedOver ? "Carried over · " : ""}
+                    Work day {fmtTaskDate(t.date)}
+                    {t.dueDate ? ` · Due ${fmtTaskDate(t.dueDate)}` : ""}
+                  </p>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <DialogFooter>
+          <Link href="/tasks">
+            <Button size="sm" variant="outline">
+              Open task board
+            </Button>
+          </Link>
+          <Button size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

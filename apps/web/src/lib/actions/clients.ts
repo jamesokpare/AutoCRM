@@ -625,6 +625,50 @@ export async function setClientServiceStatus(
 }
 
 /**
+ * Set (or clear, with null/empty) a client's free-text service status. Takes
+ * precedence over the enum `serviceStatus` for display purposes — lets a user
+ * label a client with a status that doesn't fit the fixed enum.
+ */
+export async function setClientServiceStatusCustom(
+  clientId: string,
+  value: string | null,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await requireEdit();
+    const trimmed = value?.trim() ?? "";
+    const next = trimmed.length === 0 ? null : trimmed.slice(0, 80);
+
+    const current = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, serviceStatusCustom: true },
+    });
+    if (!current) return { ok: false, error: "Client not found." };
+
+    await withMutation(
+      {
+        entityType: "Client",
+        action: "service_status_custom_changed",
+        userId: user.id,
+        entityId: clientId,
+        metadata: { from: current.serviceStatusCustom, to: next },
+      },
+      async () =>
+        prisma.client.update({
+          where: { id: clientId },
+          data: { serviceStatusCustom: next },
+        }),
+    );
+
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { id: clientId } };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
  * Delete a client and all dependent rows (vehicles, orders, parts, feedback,
  * communications, reminders, daily updates — cascaded by the schema). The
  * audit log entry is written before deletion so the trail survives.

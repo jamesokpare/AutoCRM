@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@crm-tool/ui/components/dialog";
+import { Input } from "@crm-tool/ui/components/input";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { deleteClient, setClientServiceStatus, setClientStatus } from "@/lib/actions/clients";
+import {
+  deleteClient,
+  setClientServiceStatus,
+  setClientServiceStatusCustom,
+  setClientStatus,
+} from "@/lib/actions/clients";
 
 const STATUS_OPTIONS: { value: ClientStatus; label: string }[] = [
   { value: ClientStatus.PROSPECT, label: "Prospect" },
@@ -133,6 +139,58 @@ export function ClientServiceStatusControl({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * Free-text service status input — sits next to `ClientServiceStatusControl`
+ * and lets the user type a status that doesn't fit the fixed enum (e.g.
+ * "Awaiting customer approval"). Saved on blur or Enter; cleared by emptying
+ * the field. Takes precedence over the enum for badge display.
+ */
+export function ClientServiceStatusCustomControl({
+  clientId,
+  current,
+}: {
+  clientId: string;
+  current: string | null;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(current ?? "");
+  const [pending, startTransition] = useTransition();
+
+  function save() {
+    const next = value.trim();
+    if (next === (current ?? "")) return;
+    startTransition(async () => {
+      const res = await setClientServiceStatusCustom(clientId, next || null);
+      if (!res.ok) {
+        toast.error(res.error ?? "Failed to update status.");
+        return;
+      }
+      toast.success(next ? "Custom status updated" : "Custom status cleared");
+      router.refresh();
+    });
+  }
+
+  return (
+    <Input
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      placeholder="Custom status…"
+      disabled={pending}
+      maxLength={80}
+      aria-label="Custom service status"
+      className="h-8 w-48"
+    />
   );
 }
 

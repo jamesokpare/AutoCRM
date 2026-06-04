@@ -5,7 +5,7 @@
  * directive, and a server-action module may only export async functions.
  */
 
-import type { TodayTaskSummary } from "@/lib/queries/tasks";
+import type { TodayTaskBrief, TodayTaskSummary } from "@/lib/queries/tasks";
 
 export interface ActionResult {
   ok: boolean;
@@ -16,6 +16,11 @@ export interface ActionResult {
    * clock-out (so the UI can confirm they finished — or flag what's left).
    */
   taskSummary?: TodayTaskSummary;
+  /**
+   * Full list of today's tasks (with carry-over) so the attendance UI can show
+   * the user their tasks the moment they clock in or out.
+   */
+  tasks?: TodayTaskBrief[];
   /** Human-readable reminder message to surface in a toast. */
   reminder?: string;
 }

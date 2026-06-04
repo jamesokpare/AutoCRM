@@ -189,6 +189,23 @@ export interface TodayTaskSummary {
   failed: number;
 }
 
+/**
+ * Compact task shape returned by the attendance clock-in/out flow so the UI
+ * can render the user's open list without doing a second fetch. Dates are ISO
+ * strings to cross the server-action boundary cleanly.
+ */
+export interface TodayTaskBrief {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  date: string;
+  dueDate: string | null;
+  /** True when this task's work `date` is before today's WAT start (carry-over). */
+  carriedOver: boolean;
+}
+
 export async function getTodayTaskSummary(
   userId: string,
   now: Date = new Date(),
@@ -221,6 +238,50 @@ export async function getTodayTaskSummary(
     else if (t.status === TaskStatus.FAILED) summary.failed += 1;
   }
   return summary;
+}
+
+/**
+ * Full list of today's tasks (with carry-over) for a single user, ordered so
+ * unfinished items rise to the top. Returned alongside the summary by the
+ * clock-in/out actions so the attendance UI can show the user their list.
+ */
+export async function getTodayTaskList(
+  userId: string,
+  now: Date = new Date(),
+): Promise<TodayTaskBrief[]> {
+  const todayStart = watStartOfDay(now);
+  const todayEnd = watStartOfNextDay(now);
+
+  const tasks = await prisma.task.findMany({
+    where: {
+      assigneeId: userId,
+      OR: [
+        { date: { gte: todayStart, lt: todayEnd } },
+        { date: { lt: todayStart }, status: { in: UNFINISHED } },
+      ],
+    },
+    orderBy: [{ status: "asc" }, { priority: "desc" }, { date: "asc" }],
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      date: true,
+      dueDate: true,
+    },
+  });
+
+  return tasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    status: t.status,
+    priority: t.priority,
+    date: t.date.toISOString(),
+    dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+    carriedOver: t.date.getTime() < todayStart.getTime(),
+  }));
 }
 
 /** People list for assignment selectors and board grouping. */

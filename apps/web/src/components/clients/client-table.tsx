@@ -29,7 +29,13 @@ import type { ClientListFilters, ClientListRow } from "@/lib/queries/clients";
 import { BulkMessageDialog } from "./bulk-message-dialog";
 import { ClientRowDeleteButton } from "./client-actions";
 import { ClientBulkStatusDialog } from "./client-bulk-status-dialog";
-import { ClientStatusBadge, OrderPartsBadge, ServiceStatusBadge, StatusBadge } from "./status-badge";
+import {
+  ClientStatusBadge,
+  CustomServiceStatusBadge,
+  OrderPartsBadge,
+  ServiceStatusBadge,
+  StatusBadge,
+} from "./status-badge";
 
 type QuickFilter = NonNullable<ClientListFilters["quick"]>;
 
@@ -382,8 +388,11 @@ export function ClientTable({
                       {order?.itemRequested ?? "—"}
                     </TableCell>
                     <TableCell>
-                      {client.serviceStatus || order ? (
+                      {client.serviceStatusCustom || client.serviceStatus || order ? (
                         <div className="flex flex-col gap-1">
+                          {client.serviceStatusCustom ? (
+                            <CustomServiceStatusBadge label={client.serviceStatusCustom} />
+                          ) : null}
                           {client.serviceStatus ? (
                             <ServiceStatusBadge status={client.serviceStatus} />
                           ) : null}

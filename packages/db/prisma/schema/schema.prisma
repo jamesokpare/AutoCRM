@@ -141,6 +141,10 @@ model Client {
   // Manually-set service status (CLT). Null = unset; the dashboard filters fall
   // back to the client's order statuses when this is null.
   serviceStatus    ServiceStatus?
+  // Free-text override that takes precedence over `serviceStatus` for display.
+  // Lets a user type a status that doesn't fit the fixed enum (e.g. "Awaiting
+  // customer approval"). Null = unset.
+  serviceStatusCustom String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
