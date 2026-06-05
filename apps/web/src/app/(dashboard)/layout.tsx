@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-[220px_1fr]">
+    <div className="grid h-full grid-cols-1 lg:grid-cols-[220px_1fr]">
       <DashboardSidebar
         user={{
           name: session.user.name,

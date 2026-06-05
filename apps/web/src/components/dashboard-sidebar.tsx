@@ -122,12 +122,12 @@ export function DashboardSidebar({ user }: { user: SidebarUser }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden border-r bg-card md:block">
+      <aside className="hidden border-r bg-card lg:block">
         <SidebarInner user={user} />
       </aside>
 
       {/* Mobile top bar + sheet */}
-      <div className="flex items-center justify-between border-b bg-card px-3 py-2 md:hidden">
+      <div className="flex items-center justify-between border-b bg-card px-3 py-2 lg:hidden">
         <span className="flex items-center gap-2">
           <DrivewellMark className="size-6 shrink-0" />
           <span className="text-sm font-bold tracking-tight">Drivewell</span>
