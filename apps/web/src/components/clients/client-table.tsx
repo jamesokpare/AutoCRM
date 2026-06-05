@@ -1,6 +1,6 @@
 "use client";
 
-import { OrderStatus } from "@crm-tool/db/enums";
+import { ClientStatus, OrderStatus } from "@crm-tool/db/enums";
 import { Button } from "@crm-tool/ui/components/button";
 import { Checkbox } from "@crm-tool/ui/components/checkbox";
 import { Input } from "@crm-tool/ui/components/input";
@@ -71,6 +71,15 @@ function fmtDate(d: Date | string | null): string {
 function primaryOrder(client: ClientListRow): ClientListRow["orders"][number] | undefined {
   return client.orders[0];
 }
+
+// Sort priority for the client list — ACTIVE always above PROSPECT, with
+// INACTIVE / ARCHIVED falling to the bottom.
+const CLIENT_STATUS_ORDER: Record<ClientStatus, number> = {
+  ACTIVE: 0,
+  PROSPECT: 1,
+  INACTIVE: 2,
+  ARCHIVED: 3,
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -146,12 +155,16 @@ export function ClientTable({
 
   const rawRows = data ?? [];
 
-  // Sort by most recent activity (added or last contacted) descending so the
-  // recency buckets render in order. Computed once per data change.
+  // Primary sort: client status (ACTIVE first, then PROSPECT, then INACTIVE /
+  // ARCHIVED) so the people we're actively working with always sit above leads
+  // and dormant accounts. Secondary sort: most recent activity descending, so
+  // the recency buckets still render in order within each status group.
   const rows = useMemo(() => {
-    return [...rawRows].sort(
-      (a, b) => lastActivityAt(b).getTime() - lastActivityAt(a).getTime(),
-    );
+    return [...rawRows].sort((a, b) => {
+      const sd = CLIENT_STATUS_ORDER[a.status] - CLIENT_STATUS_ORDER[b.status];
+      if (sd !== 0) return sd;
+      return lastActivityAt(b).getTime() - lastActivityAt(a).getTime();
+    });
   }, [rawRows]);
 
   // Pre-compute the bucket boundaries so each render of the table body knows
