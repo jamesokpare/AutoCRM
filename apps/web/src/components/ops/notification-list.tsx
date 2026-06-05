@@ -2,14 +2,24 @@
 
 import { Badge } from "@crm-tool/ui/components/badge";
 import { Button } from "@crm-tool/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@crm-tool/ui/components/dialog";
 import { useQuery } from "@tanstack/react-query";
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
+  clearAllNotifications,
+  deleteNotification,
   fetchNotifications,
   markAllRead,
   markRead,
@@ -27,6 +37,17 @@ function Row({ n, onChanged }: { n: NotificationView; onChanged: () => void }) {
   function toggle() {
     startTransition(async () => {
       const res = n.read ? await markUnread(n.id) : await markRead(n.id);
+      if (!res.ok) {
+        toast.error(res.error ?? "Failed");
+        return;
+      }
+      onChanged();
+    });
+  }
+
+  function dismiss() {
+    startTransition(async () => {
+      const res = await deleteNotification(n.id);
       if (!res.ok) {
         toast.error(res.error ?? "Failed");
         return;
@@ -58,9 +79,21 @@ function Row({ n, onChanged }: { n: NotificationView; onChanged: () => void }) {
         {n.body ? <div className="text-xs text-muted-foreground">{n.body}</div> : null}
         <div className="text-xs text-muted-foreground">{formatWat(n.createdAt)} (WAT)</div>
       </div>
-      <Button size="xs" variant="ghost" disabled={pending} onClick={toggle}>
-        <Check className="size-3" /> {n.read ? "Mark unread" : "Mark read"}
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button size="xs" variant="ghost" disabled={pending} onClick={toggle}>
+          <Check className="size-3" /> {n.read ? "Mark unread" : "Mark read"}
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={dismiss}
+          aria-label="Dismiss notification"
+          title="Dismiss"
+        >
+          <X className="size-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -72,6 +105,7 @@ export function NotificationList({ initial }: { initial: NotificationFeed }) {
     initialData: initial,
   });
   const [pending, startTransition] = useTransition();
+  const [clearOpen, setClearOpen] = useState(false);
 
   function allRead() {
     startTransition(async () => {
@@ -81,6 +115,21 @@ export function NotificationList({ initial }: { initial: NotificationFeed }) {
         return;
       }
       toast.success("All marked read");
+      refetch();
+    });
+  }
+
+  function clearAll() {
+    startTransition(async () => {
+      const res = await clearAllNotifications();
+      if (!res.ok) {
+        toast.error(res.error ?? "Failed");
+        return;
+      }
+      toast.success(
+        res.count ? `Cleared ${res.count} notification${res.count === 1 ? "" : "s"}` : "Cleared",
+      );
+      setClearOpen(false);
       refetch();
     });
   }
@@ -99,14 +148,47 @@ export function NotificationList({ initial }: { initial: NotificationFeed }) {
             Pull-based — refreshes on navigation and window focus.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending || data.unreadCount === 0}
-          onClick={allRead}
-        >
-          <CheckCheck className="size-4" /> Mark all read
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending || data.unreadCount === 0}
+            onClick={allRead}
+          >
+            <CheckCheck className="size-4" /> Mark all read
+          </Button>
+          <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+            <DialogTrigger
+              render={
+                <Button size="sm" variant="outline" disabled={pending || data.items.length === 0}>
+                  <Trash2 className="size-4" /> Clear all
+                </Button>
+              }
+            />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clear all notifications?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                This permanently removes all of your notifications — read and unread. This cannot
+                be undone.
+              </p>
+              <DialogFooter>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => setClearOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" variant="destructive" disabled={pending} onClick={clearAll}>
+                  {pending ? "Clearing…" : "Clear all"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {data.items.length === 0 ? (

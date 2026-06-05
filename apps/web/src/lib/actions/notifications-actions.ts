@@ -97,3 +97,25 @@ export async function markAllRead(): Promise<ActionResult> {
   revalidatePath("/notifications");
   return { ok: true, count: res.count };
 }
+
+/** Delete a single notification (only if it belongs to the caller). */
+export async function deleteNotification(id: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+  const res = await prisma.notification.deleteMany({
+    where: { id, userId: user.id },
+  });
+  revalidatePath("/notifications");
+  return { ok: true, count: res.count };
+}
+
+/** Delete all of the caller's notifications (read and unread). */
+export async function clearAllNotifications(): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+  const res = await prisma.notification.deleteMany({
+    where: { userId: user.id },
+  });
+  revalidatePath("/notifications");
+  return { ok: true, count: res.count };
+}
