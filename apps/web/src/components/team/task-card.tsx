@@ -56,6 +56,7 @@ export function TaskCard({
   const [pending, startTransition] = useTransition();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePending, startDelete] = useTransition();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const canDelete =
     !!currentUserId &&
     (task.createdBy.id === currentUserId || task.assignee.id === currentUserId);
@@ -69,37 +70,110 @@ export function TaskCard({
         highlight ? "border-destructive/50 bg-destructive/5" : "border-border",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-medium leading-tight">{task.title}</p>
-        <PriorityBadge priority={task.priority} />
-      </div>
+      <button
+        type="button"
+        onClick={() => setDetailsOpen(true)}
+        className="flex flex-col gap-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
+        aria-label={`View details for ${task.title}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="font-medium leading-tight hover:underline">{task.title}</p>
+          <PriorityBadge priority={task.priority} />
+        </div>
 
-      {task.description ? (
-        <p className="text-muted-foreground line-clamp-2">{task.description}</p>
-      ) : null}
+        {task.description ? (
+          <p className="text-muted-foreground line-clamp-2">{task.description}</p>
+        ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <PersonAvatar person={task.assignee} className="size-5" />
-          {task.assignee.name}
-        </span>
-        <span>· Day {fmtDate(task.date)}</span>
-        {task.dueDate ? (
-          <span className={cn(task.overdue && "font-medium text-destructive")}>
-            · Due {fmtDate(task.dueDate)}
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <PersonAvatar person={task.assignee} className="size-5" />
+            {task.assignee.name}
           </span>
-        ) : null}
-      </div>
+          <span>· Day {fmtDate(task.date)}</span>
+          {task.dueDate ? (
+            <span className={cn(task.overdue && "font-medium text-destructive")}>
+              · Due {fmtDate(task.dueDate)}
+            </span>
+          ) : null}
+        </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {showStatusBadge ? <StatusBadge status={task.status} /> : null}
-        {task.overdue ? (
-          <span className="font-medium text-destructive">Overdue</span>
-        ) : null}
-        {task.carriedOver ? (
-          <span className="text-amber-600 dark:text-amber-400">Carried over</span>
-        ) : null}
-      </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {showStatusBadge ? <StatusBadge status={task.status} /> : null}
+          {task.overdue ? (
+            <span className="font-medium text-destructive">Overdue</span>
+          ) : null}
+          {task.carriedOver ? (
+            <span className="text-amber-600 dark:text-amber-400">Carried over</span>
+          ) : null}
+        </div>
+      </button>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{task.title}</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={task.status} />
+              <PriorityBadge priority={task.priority} />
+              {task.overdue ? (
+                <span className="font-medium text-destructive">Overdue</span>
+              ) : null}
+              {task.carriedOver ? (
+                <span className="text-amber-600 dark:text-amber-400">Carried over</span>
+              ) : null}
+            </div>
+
+            <div>
+              <p className="font-medium text-muted-foreground">Details</p>
+              {task.description ? (
+                <p className="mt-1 whitespace-pre-wrap">{task.description}</p>
+              ) : (
+                <p className="mt-1 italic text-muted-foreground">No details provided.</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="font-medium text-muted-foreground">Work day</p>
+                <p className="mt-1">{fmtDate(task.date)}</p>
+              </div>
+              <div>
+                <p className="font-medium text-muted-foreground">Due date</p>
+                <p className={cn("mt-1", task.overdue && "font-medium text-destructive")}>
+                  {fmtDate(task.dueDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="font-medium text-muted-foreground">Assigned to</p>
+                <span className="mt-1 inline-flex items-center gap-1.5">
+                  <PersonAvatar person={task.assignee} className="size-5" />
+                  {task.assignee.name}
+                </span>
+              </div>
+              <div>
+                <p className="font-medium text-muted-foreground">Created by</p>
+                <span className="mt-1 inline-flex items-center gap-1.5">
+                  <PersonAvatar person={task.createdBy} className="size-5" />
+                  {task.createdBy.name}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button size="sm" variant="outline" onClick={() => setDetailsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-center gap-2 pt-1">
         <Select
