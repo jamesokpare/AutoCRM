@@ -13,6 +13,7 @@ import type {
   CreateTaskInput,
   SetTaskStatusInput,
   TaskActionResult,
+  UpdateTaskInput,
 } from "./tasks-types";
 
 const ALL_STATUSES = Object.values(TaskStatus) as TaskStatus[];
@@ -145,6 +146,79 @@ export async function deleteTask(taskId: string): Promise<TaskActionResult> {
     revalidatePath("/team");
     revalidatePath("/tasks");
     return { ok: true, taskId };
+  } catch (err) {
+    return asResult(err);
+  }
+}
+
+/**
+ * Edit an existing task. Allowed for the creator or the assignee (same rule as
+ * delete). When the assignee changes, the new assignee gets a TASK_ASSIGNED
+ * notification (ACC-05) so reassignment surfaces in their inbox.
+ */
+export async function updateTask(input: UpdateTaskInput): Promise<TaskActionResult> {
+  const user = await getSessionUser();
+  try {
+    if (!user) throw new PermissionError("UNAUTHENTICATED", "You must be signed in.");
+    if (!input.taskId) return { ok: false, error: "Missing task." };
+
+    const existing = await prisma.task.findUnique({
+      where: { id: input.taskId },
+      select: { id: true, createdById: true, assigneeId: true, date: true, dueDate: true },
+    });
+    if (!existing) return { ok: false, error: "Task not found." };
+
+    if (existing.createdById !== user.id && existing.assigneeId !== user.id) {
+      return { ok: false, error: "Only the creator or assignee can edit this task." };
+    }
+
+    const title = input.title?.trim();
+    if (!title) return { ok: false, error: "Title is required." };
+
+    const assigneeId = input.assigneeId?.trim() || existing.assigneeId;
+    const priority = ALL_PRIORITIES.includes(input.priority as TaskPriority)
+      ? (input.priority as TaskPriority)
+      : undefined;
+
+    const date = parseDate(input.date, existing.date)!;
+    const dueDate =
+      input.dueDate === undefined ? existing.dueDate : parseDate(input.dueDate, null);
+
+    await withMutation(
+      {
+        entityType: "Task",
+        action: "updated",
+        userId: user.id,
+        entityId: input.taskId,
+        metadata: { assigneeId, priority },
+      },
+      async () =>
+        prisma.task.update({
+          where: { id: input.taskId },
+          data: {
+            title,
+            description: input.description?.trim() || null,
+            date,
+            dueDate,
+            ...(priority ? { priority } : {}),
+            assigneeId,
+          },
+        }),
+    );
+
+    if (assigneeId !== existing.assigneeId && assigneeId !== user.id) {
+      await createNotification({
+        userId: assigneeId,
+        type: NotificationType.TASK_ASSIGNED,
+        title: "Task reassigned to you",
+        body: title,
+        link: "/tasks",
+      });
+    }
+
+    revalidatePath("/team");
+    revalidatePath("/tasks");
+    return { ok: true, taskId: input.taskId };
   } catch (err) {
     return asResult(err);
   }

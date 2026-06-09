@@ -70,6 +70,7 @@ export function MyWeek({
                     task={t}
                     showStatusBadge
                     currentUserId={currentUserId}
+                    members={members}
                     onChanged={refresh}
                   />
                 ))}

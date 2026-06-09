@@ -21,12 +21,12 @@ import {
 } from "@crm-tool/ui/components/select";
 import { Textarea } from "@crm-tool/ui/components/textarea";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { type ReactElement, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { createTask } from "@/lib/actions/tasks";
+import { createTask, updateTask } from "@/lib/actions/tasks";
 
-import type { PersonDTO } from "./types";
+import type { PersonDTO, TaskDTO } from "./types";
 
 const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
   { value: TaskPriority.LOW, label: "Low" },
@@ -41,27 +41,68 @@ function todayISO(): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10);
 }
 
+function isoDateOnly(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toISOString().slice(0, 10);
+}
+
+/**
+ * Dual-purpose dialog: create a new task, or edit an existing one when `task`
+ * is supplied. The fields, validation, and member picker are identical between
+ * the two modes — only the submitted action and labels differ.
+ */
 export function TaskForm({
   members,
   currentUserId,
   triggerLabel = "New task",
+  task,
+  trigger,
+  open: openProp,
+  onOpenChange,
 }: {
   members: PersonDTO[];
   currentUserId: string;
   triggerLabel?: string;
+  /** When supplied, the form edits this task instead of creating a new one. */
+  task?: TaskDTO;
+  /** Custom trigger element (e.g. an icon button on a card). */
+  trigger?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (next: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const isEdit = !!task;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next);
+    if (openProp === undefined) setInternalOpen(next);
+  };
   const [pending, startTransition] = useTransition();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(todayISO());
-  const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-  const [assigneeId, setAssigneeId] = useState(currentUserId);
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [description, setDescription] = useState(task?.description ?? "");
+  const [date, setDate] = useState(task ? isoDateOnly(task.date) : todayISO());
+  const [dueDate, setDueDate] = useState(isoDateOnly(task?.dueDate));
+  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? TaskPriority.MEDIUM);
+  const [assigneeId, setAssigneeId] = useState(task?.assignee.id ?? currentUserId);
+
+  // Re-sync fields when the dialog opens — the parent may pass a refreshed task
+  // after a server revalidate.
+  useEffect(() => {
+    if (!open) return;
+    if (task) {
+      setTitle(task.title);
+      setDescription(task.description ?? "");
+      setDate(isoDateOnly(task.date));
+      setDueDate(isoDateOnly(task.dueDate));
+      setPriority(task.priority);
+      setAssigneeId(task.assignee.id);
+    }
+  }, [open, task]);
 
   function reset() {
+    if (isEdit) return;
     setTitle("");
     setDescription("");
     setDate(todayISO());
@@ -72,10 +113,10 @@ export function TaskForm({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm">{triggerLabel}</Button>} />
+      <DialogTrigger render={trigger ?? <Button size="sm">{triggerLabel}</Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create task</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit task" : "Create task"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -175,26 +216,42 @@ export function TaskForm({
                   toast.error("Title is required");
                   return;
                 }
-                const res = await createTask({
-                  title,
-                  description,
-                  date,
-                  dueDate: dueDate || null,
-                  priority,
-                  assigneeId,
-                });
+                const res = isEdit
+                  ? await updateTask({
+                      taskId: task!.id,
+                      title,
+                      description,
+                      date,
+                      dueDate: dueDate || null,
+                      priority,
+                      assigneeId,
+                    })
+                  : await createTask({
+                      title,
+                      description,
+                      date,
+                      dueDate: dueDate || null,
+                      priority,
+                      assigneeId,
+                    });
                 if (!res.ok) {
-                  toast.error(res.error ?? "Failed to create task");
+                  toast.error(res.error ?? (isEdit ? "Failed to update task" : "Failed to create task"));
                   return;
                 }
-                toast.success("Task created");
+                toast.success(isEdit ? "Task updated" : "Task created");
                 reset();
                 setOpen(false);
                 router.refresh();
               })
             }
           >
-            {pending ? "Creating…" : "Create task"}
+            {pending
+              ? isEdit
+                ? "Saving…"
+                : "Creating…"
+              : isEdit
+                ? "Save changes"
+                : "Create task"}
           </Button>
         </DialogFooter>
       </DialogContent>
