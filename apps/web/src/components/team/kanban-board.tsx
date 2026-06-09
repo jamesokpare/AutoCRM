@@ -4,7 +4,7 @@ import { TaskStatus } from "@crm-tool/db/enums";
 import { Badge } from "@crm-tool/ui/components/badge";
 
 import { TaskCard } from "./task-card";
-import type { TaskDTO } from "./types";
+import type { PersonDTO, TaskDTO } from "./types";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: TaskStatus.PENDING, label: "Pending" },
@@ -20,10 +20,12 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
 export function KanbanBoard({
   tasks,
   currentUserId,
+  members,
   onChanged,
 }: {
   tasks: TaskDTO[];
   currentUserId?: string;
+  members?: PersonDTO[];
   onChanged?: () => void;
 }) {
   return (
@@ -47,6 +49,7 @@ export function KanbanBoard({
                     key={t.id}
                     task={t}
                     currentUserId={currentUserId}
+                    members={members}
                     onChanged={onChanged}
                   />
                 ))

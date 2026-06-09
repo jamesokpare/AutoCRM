@@ -31,3 +31,13 @@ export interface SetTaskStatusInput {
   taskId: string;
   status: TaskStatus;
 }
+
+export interface UpdateTaskInput {
+  taskId: string;
+  title: string;
+  description?: string | null;
+  date?: string | null;
+  dueDate?: string | null;
+  priority?: TaskPriority;
+  assigneeId?: string | null;
+}

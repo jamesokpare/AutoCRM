@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@crm-tool/ui/components/select";
 import { cn } from "@crm-tool/ui/lib/utils";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -26,7 +26,8 @@ import { deleteTask, setTaskStatus } from "@/lib/actions/tasks";
 
 import { PersonAvatar } from "./person-avatar";
 import { PriorityBadge, StatusBadge } from "./task-badges";
-import type { TaskDTO } from "./types";
+import { TaskForm } from "./task-form";
+import type { PersonDTO, TaskDTO } from "./types";
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: TaskStatus.PENDING, label: "Pending" },
@@ -44,22 +45,28 @@ export function TaskCard({
   task,
   showStatusBadge = false,
   currentUserId,
+  members,
   onChanged,
 }: {
   task: TaskDTO;
   /** Show a status badge inline (used in list/my-week; kanban groups by status). */
   showStatusBadge?: boolean;
-  /** Used to decide whether the delete affordance is shown. */
+  /** Used to decide whether the delete/edit affordances are shown. */
   currentUserId?: string;
+  /** Team roster — when supplied, an edit affordance is shown to the creator/assignee. */
+  members?: PersonDTO[];
   onChanged?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePending, startDelete] = useTransition();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const canDelete =
+  const [editOpen, setEditOpen] = useState(false);
+  const ownsTask =
     !!currentUserId &&
     (task.createdBy.id === currentUserId || task.assignee.id === currentUserId);
+  const canDelete = ownsTask;
+  const canEdit = ownsTask && !!members;
 
   const highlight = task.overdue || task.status === TaskStatus.FAILED;
 
@@ -206,6 +213,30 @@ export function TaskCard({
         </Select>
         {pending ? <Button size="xs" variant="ghost" disabled>…</Button> : null}
 
+        {canEdit && members ? (
+          <TaskForm
+            members={members}
+            currentUserId={currentUserId!}
+            task={task}
+            open={editOpen}
+            onOpenChange={(next) => {
+              setEditOpen(next);
+              if (!next) onChanged?.();
+            }}
+            trigger={
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                className="ml-auto text-muted-foreground hover:text-foreground"
+                aria-label="Edit task"
+                title="Edit task"
+              >
+                <Pencil className="size-3" />
+              </Button>
+            }
+          />
+        ) : null}
+
         {canDelete ? (
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogTrigger
@@ -213,7 +244,10 @@ export function TaskCard({
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  className="ml-auto text-muted-foreground hover:text-destructive"
+                  className={cn(
+                    "text-muted-foreground hover:text-destructive",
+                    canEdit && members ? "" : "ml-auto",
+                  )}
                   aria-label="Delete task"
                   title="Delete task"
                 >

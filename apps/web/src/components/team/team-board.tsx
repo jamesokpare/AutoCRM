@@ -169,6 +169,7 @@ export function TeamBoard({
                   task={t}
                   showStatusBadge
                   currentUserId={currentUserId}
+                  members={members}
                   onChanged={refresh}
                 />
               ))}
@@ -177,7 +178,12 @@ export function TeamBoard({
         </TabsPanel>
 
         <TabsPanel value="kanban" className="pt-3">
-          <KanbanBoard tasks={filtered} currentUserId={currentUserId} onChanged={refresh} />
+          <KanbanBoard
+            tasks={filtered}
+            currentUserId={currentUserId}
+            members={members}
+            onChanged={refresh}
+          />
         </TabsPanel>
       </Tabs>
     </div>
