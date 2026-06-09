@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { TaskAlertWatcher } from "@/components/ops/task-alert-watcher";
 import { prisma } from "@/lib/db";
 
 /**
@@ -51,6 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         counts={{ notifications: notificationCount, tasks: taskCount }}
       />
       <main className="min-w-0 overflow-y-auto p-4 md:p-6">{children}</main>
+      <TaskAlertWatcher />
     </div>
   );
 }
